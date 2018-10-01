@@ -18,4 +18,5 @@ DebOut=
 [FILES]
 1=dialog.asm
 2=dialog.inc
-3=dialog.rc
+3=song.inc
+4=dialog.rc

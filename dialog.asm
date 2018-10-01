@@ -13,6 +13,11 @@ start:
 	invoke	DialogBoxParam, hInstance, IDD_MAIN, 0, offset DlgProc, 0
 	invoke	ExitProcess, eax
 
+;-------------------------------------------------------------------------------------------------------
+; 用户交互界面
+; Receives: hWin是窗口句柄，uMsg是消息类别，wParam是消息参数
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
 DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 	mov	eax,uMsg
 	
@@ -34,5 +39,14 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 	xor	eax,eax
 	ret
 DlgProc endp
+
+;-------------------------------------------------------------------------------------------------------
+; 完成音乐播放器逻辑上的初始化
+; Receives: none
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+init proc
+	Ret
+init endp
 
 end start
