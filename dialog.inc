@@ -3,20 +3,18 @@ INCLUDE		user32.inc
 INCLUDE		kernel32.inc
 INCLUDE		comctl32.inc	;windows common controls
 INCLUDE winmm.inc
-;INCLUDE song.inc
+INCLUDE song.inc
 
 INCLUDELIB	user32.lib
 INCLUDELIB	kernel32.lib
 INCLUDELIB	comctl32.lib	;windows common controls
 INCLUDELIB winmm.lib
 
-DlgProc		PROTO	:DWORD,:DWORD,:DWORD,:DWORD
 
-Song STRUCT
-	_name BYTE ?;歌曲名
-	_path BYTE ?;歌曲路径
-	_size BYTE ?;歌曲大小
-Song ends
+DlgProc		PROTO	:DWORD,:DWORD,:DWORD,:DWORD
+init PROTO
+play PROTO :DWORD
+stop PROTO :DWORD
 
 .const
 IDD_MAIN		EQU 1000
@@ -34,11 +32,23 @@ IDC_AddSongButton		EQU 1013;导入新的歌曲的按钮
 
 .data
 	FileName BYTE "star.mp3",0
-	OPENMP3 BYTE "open star.mp3 alias mysong",0
+	OPENMP3 BYTE "open Music/star.mp3 alias mysong",0
 	PLAYMP3 BYTE "play mysong wait",0
+	
+	openSong BYTE "open %s alias currentSong",0;打开歌曲命令
+	playSong BYTE "play currentSong", 0;播放歌曲命令
+	pauseSong BYTE "pause currentSong",0;暂停歌曲命令
+	resumeSong BYTE "resume currentSong",0;恢复歌曲播放命令
+	closeSong BYTE "close currentSong",0;关闭当前歌曲命令
+
+currentStatus BYTE 0;当前的播放状态
+;0:停止状态
+;1:播放状态
+;2:暂停状态
+currentSong Song <>;当前歌曲
 
 .data?
 hInstance	dd	?
 mediaCommand BYTE ?; 多媒体控制命令
-;currentSong Song <"夜空中最亮的星","star.mp3","2">;当前歌曲
-currentSong Song <>;当前歌曲
+
+
