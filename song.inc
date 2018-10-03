@@ -2,9 +2,8 @@ IFNDEF SONGMENU_INC
 SONGMENU_INC EQU <1>
 
 Song STRUCT
-	_name BYTE "夜空中最亮的星",0;歌曲名
-	_path BYTE "Music/star.mp3",0;歌曲路径
-	_songSize BYTE 0;歌曲大小
+	_name BYTE 100 DUP(0);歌曲名
+	_path BYTE 100 DUP(0);歌曲路径
 Song ends
 
 ELSE

@@ -5,13 +5,13 @@
 #define IDC_PrevSong 1002
 #define IDC_PlayButton 1003
 #define IDC_NextSong 1004
-#define IDC_SongMenu 1005
 #define IDC_STATIC1007 1007
 #define IDC_STATIC1008 1008
 #define IDC_TimeSlider 1006
 #define IDC_VolumnSlider 1009
 #define IDC_SearchEdit 1010
 #define IDC_AddSongButton 1013
+#define IDC_SongMenu 1016
 
 200 ICON DISCARDABLE "bones.ico"
 
@@ -25,12 +25,12 @@ BEGIN
 	CONTROL "上一首",IDC_PrevSong,"Button",0x50010000,7,244,34,25,0x00000000
 	CONTROL "播放/暂停",IDC_PlayButton,"Button",0x50010000,43,244,41,26,0x00000000
 	CONTROL "下一首",IDC_NextSong,"Button",0x50010000,87,244,37,28,0x00000000
-	CONTROL "",IDC_SongMenu,"ListBox",0x50010140,87,28,451,204,0x00000200
 	CONTROL "",IDC_TimeSlider,"msctls_trackbar32",0x50010000,170,252,187,13,0x00000000
 	CONTROL "播放进度",IDC_STATIC1007,"Static",0x50000000,133,252,41,13,0x00000000
 	CONTROL "音量",IDC_STATIC1008,"Static",0x50000000,367,252,31,16,0x00000000
 	CONTROL "",IDC_VolumnSlider,"msctls_trackbar32",0x50010000,403,252,54,13,0x00000000
 	CONTROL "搜索歌曲",IDC_SearchEdit,"Edit",0x50010080,90,6,77,16,0x00000200
 	CONTROL "导入歌曲",IDC_AddSongButton,"Button",0x50010000,377,6,64,16,0x00000000
+	CONTROL "",IDC_SongMenu,"ListBox",0x50210141,93,40,437,194,0x00000200
 END
 
