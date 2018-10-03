@@ -3,7 +3,7 @@ INCLUDE		user32.inc
 INCLUDE		kernel32.inc
 INCLUDE		comctl32.inc	;windows common controls
 INCLUDE winmm.inc
-INCLUDE song.inc
+;INCLUDE song.inc
 INCLUDE msvcrt.inc
 
 INCLUDELIB	user32.lib
@@ -19,6 +19,12 @@ openSong PROTO:DWORD, :DWORD
 playPause PROTO :DWORD
 closeSong PROTO :DWORD
 changeSong PROTO :DWORD, :DWORD
+
+;歌曲结构体
+Song STRUCT
+	_name BYTE 100 DUP(0);歌曲名
+	_path BYTE 100 DUP(0);歌曲路径
+Song ends
 
 .const
 	IDD_MAIN		EQU 1000
