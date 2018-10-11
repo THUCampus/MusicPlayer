@@ -2,15 +2,19 @@ INCLUDE		windows.inc
 INCLUDE		user32.inc
 INCLUDE		kernel32.inc
 INCLUDE		comctl32.inc	;windows common controls
-INCLUDE winmm.inc
+INCLUDE		winmm.inc
+INCLUDE		comdlg32.inc
+INCLUDE		msvcrt.inc
+
 ;INCLUDE song.inc
 INCLUDE msvcrt.inc
 
 INCLUDELIB	user32.lib
 INCLUDELIB	kernel32.lib
 INCLUDELIB	comctl32.lib	;windows common controls
-INCLUDELIB winmm.lib
-INCLUDELIB msvcrt.lib
+INCLUDELIB	winmm.lib
+INCLUDELIB	msvcrt.lib
+INCLUDELIB  comdlg32.lib
 
 ;请将函数声明写在此处
 DlgProc		PROTO	:DWORD,:DWORD,:DWORD,:DWORD
@@ -19,6 +23,10 @@ openSong PROTO:DWORD, :DWORD
 playPause PROTO :DWORD
 closeSong PROTO :DWORD
 changeSong PROTO :DWORD, :DWORD
+addSong PROTO :DWORD
+deleteSong PROTO :DWORD
+loadFile PROTO :DWORD
+saveFile PROTO :DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -39,13 +47,17 @@ Song ends
 	IDC_SearchEdit		EQU 1010;关键词搜索输入
 	IDC_AddSongButton		EQU 1013;导入新的歌曲的按钮
 	IDC_SongMenu		EQU 1016;歌单列表
+	IDC_DeleteSong      EQU 1017;删除歌曲
+	
+	MAX_SONG_MENU_SIZE EQU 100
 	
 .data	
-	openSongCommand BYTE "open %s alias currentSong",0;打开歌曲命令
+	openSongCommand BYTE 'open "%s" alias currentSong',0;打开歌曲命令
 	playSongCommand BYTE "play currentSong", 0;播放歌曲命令
 	pauseSongCommand BYTE "pause currentSong",0;暂停歌曲命令
 	resumeSongCommand BYTE "resume currentSong",0;恢复歌曲播放命令
 	closeSongCommand BYTE "close currentSong",0;关闭当前歌曲命令
+	songMenuFilename BYTE "\\song.dat",0 ;歌单保存位置
 	
 	debug BYTE "%d",0;调试信息
 
@@ -55,14 +67,27 @@ Song ends
 	;2:暂停状态
 	currentSongIndex DWORD 0;当前歌曲在歌单中的下标
 	
-	;---歌单信息,暂时将其内容直接写在代码中---
-	songMenu Song <"夜空中最亮的星","Music/star.mp3">,
-	<"平凡之路","Music/road.mp3">,
-	<"阳光宅男","Music/sun.mp3">
-	songMenuSize DWORD 3;歌单大小
+	;---歌单信息,将其内容写在文件中---
+	songMenu Song 100 dup(<"1", "1">)
+	songMenuSize DWORD 0;歌单大小
 	;---歌单信息---
+	
+	;---打开文件对话框---
+	openfilename OPENFILENAME <>
+	szLoadTitle BYTE '选择歌曲', 0
+	szInitDir BYTE '\\', 0
+	szOpenFileNames BYTE 8000 DUP(0)
+	szFileName BYTE 100 DUP(0)
+	szPath BYTE 100 DUP(0)
+	nMaxFile = SIZEOF szOpenFileNames
+	szBaseDir BYTE 256 DUP(0)
+	sep BYTE '\\'
+	szWarningTitle BYTE 'Warning', 0
+	szWarning BYTE '请选择要删除的歌曲', 0
+	;---打开文件对话框---
 
 .data?
 	hInstance	dd	?
 	mediaCommand BYTE ?; 多媒体控制命令(mciSendString需要附加参数时使用）
 
+ 

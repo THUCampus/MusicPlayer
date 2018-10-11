@@ -22,6 +22,7 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 	mov	eax,uMsg
 	
 	.if	eax == WM_INITDIALOG;初始化界面
+		invoke loadFile, hWin
 		invoke init, hWin
 		invoke	LoadIcon,hInstance,200
 		invoke	SendMessage, hWin, WM_SETICON, 1, eax
@@ -29,6 +30,8 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 		mov	eax,wParam
 		.if	eax == IDB_EXIT;按下退出键
 			invoke	SendMessage, hWin, WM_CLOSE, 0, 0
+		.elseif eax == IDC_AddSongButton;按下导入歌曲键
+			invoke addSong, hWin
 		.elseif songMenuSize == 0;若干歌单大小为0
 			Ret;则下述操作都不进行！！！
 		.elseif eax == IDC_PlayButton;若按下播放/暂停键
@@ -55,10 +58,13 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			.endif
 			invoke SendDlgItemMessage,hWin, IDC_SongMenu, LB_SETCURSEL, currentSongIndex, 0;改变选中项
 			invoke changeSong,hWin,currentSongIndex;播放该首歌曲
+		.elseif eax == IDC_DeleteSong
+			invoke deleteSong, hWin
 		.endif
 		
 	.elseif	eax == WM_CLOSE;程序退出时执行
 		invoke closeSong, hWin
+		invoke saveFile, hWin
 		invoke	EndDialog, hWin, 0
 	.endif
 
@@ -75,13 +81,14 @@ init proc hWin:DWORD
 	;展示歌单中的所有歌曲
 	mov esi, offset songMenu
 	mov ecx, songMenuSize
-	L1:
-		push ecx
-		invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_ADDSTRING, 0, ADDR (Song PTR [esi])._name
-		add esi, TYPE songMenu
-		pop ecx
-	loop L1
-
+	.IF ecx > 0
+		L1:
+			push ecx
+			invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_ADDSTRING, 0, ADDR (Song PTR [esi])._name
+			add esi, TYPE songMenu
+			pop ecx
+		loop L1
+	.ENDIF
 	Ret
 init endp
 
@@ -142,11 +149,173 @@ changeSong endp
 ; Receives: hWin是窗口句柄；
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
-closeSong proc hWin:DWORD
+closeSong proc uses eax hWin:DWORD 
 	.if currentStatus != 0;当前状态为播放或者暂停
 		invoke mciSendString, ADDR closeSongCommand, NULL, 0, NULL
 	.endif
 	Ret
 closeSong endp
+
+;-------------------------------------------------------------------------------------------------------
+; 导入新的歌曲
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+addSong proc uses eax ebx esi edi hWin:DWORD
+	LOCAL nLen: DWORD
+	LOCAL curOffset: DWORD
+	LOCAL originOffset: DWORD
+	LOCAL curSize: DWORD
+	mov al,0
+	mov edi, OFFSET openfilename
+	mov ecx, SIZEOF openfilename
+	cld
+	rep stosb
+	mov openfilename.lStructSize, SIZEOF openfilename
+	mov eax, hWin
+	mov openfilename.hwndOwner, eax
+	mov eax, OFN_ALLOWMULTISELECT
+	or eax, OFN_EXPLORER
+	mov openfilename.Flags, eax
+	mov openfilename.nMaxFile, nMaxFile
+	mov openfilename.lpstrTitle, OFFSET szLoadTitle
+	mov openfilename.lpstrInitialDir, OFFSET szInitDir
+	mov openfilename.lpstrFile, OFFSET szOpenFileNames
+	invoke GetOpenFileName, ADDR openfilename
+	.IF eax == 1
+		invoke lstrcpyn, ADDR szPath, ADDR szOpenFileNames, openfilename.nFileOffset
+		invoke lstrlen, ADDR szPath
+		mov nLen, eax
+		mov ebx, eax
+		mov al, szPath[ebx]
+		.IF al != sep
+			mov al, sep
+			mov szPath[ebx], al
+			mov szPath[ebx + 1], 0
+		.ENDIF
+		mov ebx, songMenuSize
+		mov curSize, ebx
+		mov edi, OFFSET songMenu
+		mov eax, SIZEOF Song
+		mul ebx
+		add edi, eax
+		mov curOffset, edi
+		mov originOffset, edi
+		mov esi, OFFSET szOpenFileNames
+		mov eax, 0
+		mov ax, openfilename.nFileOffset
+		add esi, eax
+		mov al, [esi]
+		.WHILE al != 0
+			mov szFileName, 0
+			invoke lstrcat, ADDR szFileName, ADDR szPath
+			invoke lstrcat, ADDR szFileName, esi
+			mov edi, curOffset
+			add curOffset, SIZEOF Song
+			invoke lstrcpy, edi, esi
+			add edi, 100
+			invoke lstrcpy, edi, ADDR szFileName
+			invoke lstrlen, esi
+			inc eax
+			add esi, eax
+			add songMenuSize, 1
+			mov al, [esi]
+		.ENDW
+		mov esi, originOffset
+		mov ecx, songMenuSize
+		sub ecx, curSize
+		.IF ecx > 0
+			L1:
+				push ecx
+				invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_ADDSTRING, 0, ADDR (Song PTR [esi])._name
+				add esi, TYPE songMenu
+				pop ecx
+			loop L1
+		.ENDIF
+	.ENDIF
+	ret
+addSong endp
+
+;-------------------------------------------------------------------------------------------------------
+; 从歌单文件读取歌曲
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+loadFile proc uses eax hWin:DWORD
+	LOCAL hFile: DWORD
+	LOCAL bytesRead: DWORD
+	invoke crt__getcwd, ADDR szBaseDir, SIZEOF szBaseDir
+	invoke lstrcpy, ADDR szFileName, ADDR szBaseDir
+	invoke lstrcat, ADDR szFileName, ADDR songMenuFilename
+	INVOKE CreateFile, ADDR szFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0
+	mov hFile, eax
+	.IF hFile == INVALID_HANDLE_VALUE
+		mov songMenuSize, 0
+	.ELSE
+		INVOKE ReadFile, hFile, ADDR songMenuSize, SIZEOF songMenuSize, ADDR bytesRead, NULL
+		.IF bytesRead != SIZEOF songMenuSize
+			mov songMenuSize, 0
+		.ELSE
+			INVOKE ReadFile, hFile, ADDR songMenu, SIZEOF songMenu, ADDR bytesRead, NULL
+			.IF bytesRead != SIZEOF songMenu
+				mov songMenuSize, 0
+			.ENDIF
+		.ENDIF
+	.ENDIF
+	INVOKE CloseHandle, hFile
+	ret
+loadFile endp
+
+;-------------------------------------------------------------------------------------------------------
+; 保存歌曲列表到文件
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+saveFile proc hWin:DWORD
+	LOCAL hFile: HANDLE
+	LOCAL bytesWritten: DWORD
+	invoke lstrcat, ADDR szBaseDir, ADDR songMenuFilename
+	INVOKE CreateFile, ADDR szBaseDir, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0
+	mov hFile, eax
+	.IF hFile == INVALID_HANDLE_VALUE
+		ret
+	.ENDIF
+	INVOKE WriteFile, hFile, ADDR songMenuSize, SIZEOF songMenuSize, ADDR bytesWritten, NULL
+	INVOKE WriteFile, hFile, ADDR songMenu, SIZEOF songMenu, ADDR bytesWritten, NULL
+	INVOKE CloseHandle, hFile
+	ret
+saveFile endp
+
+;-------------------------------------------------------------------------------------------------------
+; 删除歌曲列表中选中的曲子
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+deleteSong proc hWin: DWORD
+	invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_GETCURSEL, 0, 0;则获取被选中的下标
+	.IF eax == -1
+		invoke MessageBox, hWin, ADDR szWarning, ADDR szWarningTitle, MB_OK
+	.ELSE
+		push eax
+		invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_DELETESTRING, eax, 0
+		pop eax
+		mov ebx, eax
+		add ebx, 1
+		mov edi, OFFSET songMenu
+		mov edx, SIZEOF Song
+		mul edx
+		add edi, eax
+		mov esi, edi
+		add esi, SIZEOF Song
+		.while ebx < songMenuSize
+			mov ecx, SIZEOF Song
+			cld
+			rep movsb
+			add ebx, 1
+		.endw
+		sub songMenuSize, 1
+	.ENDIF
+	ret
+deleteSong endp
 
 end start
