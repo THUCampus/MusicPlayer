@@ -24,6 +24,9 @@ playPause PROTO :DWORD
 closeSong PROTO :DWORD
 changeSong PROTO :DWORD, :DWORD
 addSong PROTO :DWORD
+deleteSong PROTO :DWORD
+loadFile PROTO :DWORD
+saveFile PROTO :DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -44,6 +47,7 @@ Song ends
 	IDC_SearchEdit		EQU 1010;关键词搜索输入
 	IDC_AddSongButton		EQU 1013;导入新的歌曲的按钮
 	IDC_SongMenu		EQU 1016;歌单列表
+	IDC_DeleteSong      EQU 1017;删除歌曲
 	
 	MAX_SONG_MENU_SIZE EQU 100
 	
@@ -53,8 +57,7 @@ Song ends
 	pauseSongCommand BYTE "pause currentSong",0;暂停歌曲命令
 	resumeSongCommand BYTE "resume currentSong",0;恢复歌曲播放命令
 	closeSongCommand BYTE "close currentSong",0;关闭当前歌曲命令
-
-	songMenuFilename BYTE "./song.dat",0 ;歌单保存位置
+	songMenuFilename BYTE "\\song.dat",0 ;歌单保存位置
 	
 	debug BYTE "%d",0;调试信息
 
@@ -79,6 +82,8 @@ Song ends
 	nMaxFile = SIZEOF szOpenFileNames
 	szBaseDir BYTE 256 DUP(0)
 	sep BYTE '\\'
+	szWarningTitle BYTE 'Warning', 0
+	szWarning BYTE '请选择要删除的歌曲', 0
 	;---打开文件对话框---
 
 .data?
