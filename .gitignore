@@ -3,3 +3,6 @@ MusicPlayer.vcxproj.filters
 MusicPlayer.vcxproj.user
 Debug/
 song.dat
+dialog.aps
+resource.h
+
