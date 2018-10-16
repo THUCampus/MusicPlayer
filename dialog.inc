@@ -43,11 +43,12 @@ Song ends
 	IDC_STATIC1007		EQU 1007
 	IDC_STATIC1008		EQU 1008
 	IDC_TimeSlider		EQU 1006;时间进度条
-	IDC_VolumnSlider		EQU 1009;音量
+	IDC_VolumeSlider		EQU 1009;音量
 	IDC_SearchEdit		EQU 1010;关键词搜索输入
 	IDC_AddSongButton		EQU 1013;导入新的歌曲的按钮
 	IDC_SongMenu		EQU 1016;歌单列表
 	IDC_DeleteSong      EQU 1017;删除歌曲
+	IDC_STATIC1018		EQU 1018;htxtest
 	
 	MAX_SONG_MENU_SIZE EQU 100
 	
@@ -58,8 +59,15 @@ Song ends
 	resumeSongCommand BYTE "resume currentSong",0;恢复歌曲播放命令
 	closeSongCommand BYTE "close currentSong",0;关闭当前歌曲命令
 	songMenuFilename BYTE "\\song.dat",0 ;歌单保存位置
+	adjustVolumeCommand BYTE "setaudio currentSong volume to %d",0;调整音量命令
 	
-	debug BYTE "%d",0;调试信息
+	debug BYTE 'haha%s%s%dheihei',0;调试信息
+	debugint BYTE '%d',0
+	htxtest BYTE "htxtest",0
+	integertest BYTE 48
+	wsprintftest BYTE 100 DUP(0)
+	htxtesttimes DWORD 0
+	curSlider DWORD ?
 
 	currentStatus BYTE 0;当前的播放状态
 	;0:停止状态
@@ -69,7 +77,7 @@ Song ends
 	
 	;---歌单信息,将其内容写在文件中---
 	songMenu Song 100 dup(<"1", "1">)
-	songMenuSize DWORD 0;歌单大小
+	songMenuSize DWORD 0;歌单大小】
 	;---歌单信息---
 	
 	;---打开文件对话框---

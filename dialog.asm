@@ -5,6 +5,14 @@ option	casemap :none
 
 include		dialog.inc
 
+;18/10/17凌晨 todo list:
+;获取歌曲长度配合进度条用于调整进度
+;用分钟：秒的形式显示当前进度
+;显示当前音量大小 0-100 (实际音量/10取整)
+;实现单曲循环（直接用mci命令）
+;实现列表循环（写个函数）
+;预计剩余工作时间:8小时
+
 .code
 start:
 	invoke	GetModuleHandle, NULL
@@ -20,12 +28,66 @@ start:
 ;-------------------------------------------------------------------------------------------------------
 DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 	mov	eax,uMsg
-	
 	.if	eax == WM_INITDIALOG;初始化界面
 		invoke loadFile, hWin
 		invoke init, hWin
 		invoke	LoadIcon,hInstance,200
 		invoke	SendMessage, hWin, WM_SETICON, 1, eax
+		
+		;htxtest
+		invoke wsprintf,addr wsprintftest,addr debug,addr playSongCommand,addr playSongCommand,integertest
+		;invoke wsprintf,addr wsprintftest,addr debug,integertest;,addr playSongCommand
+		;invoke MessageBox,hWin,addr integertest, addr htxtest, MB_OK
+		invoke MessageBox,hWin,addr wsprintftest, addr htxtest, MB_OK
+		;invoke SendDlgItemMessage,hWin,IDC_STATIC1018,123,0
+		;htxtest over
+		
+	.elseif eax == WM_HSCROLL;slider消息
+		;todo htx
+		;获取发送消息的Slider的控件号并存在curSlider变量里
+		invoke GetDlgCtrlID,lParam
+		mov curSlider,eax
+		;invoke wsprintf,addr wsprintftest,addr debugint,curSlider
+		;invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
+		
+		mov ax,WORD PTR wParam;wParam的低位字代表消息类别
+		.if curSlider == IDC_VolumeSlider;调节音量
+			.if ax == SB_THUMBTRACK;滚动结束消息
+				inc htxtesttimes
+				invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_GETCURSEL, 0, 0;则获取被选中的下标
+				.if eax != -1;当前有歌曲被选中，则发送mcisendstring命令调整音量
+					mov ebx, eax;将下标放到ebx里
+					invoke SendDlgItemMessage,hWin,curSlider,TBM_GETPOS,0,0;获取当前Slider游标位置
+					invoke wsprintf, addr mediaCommand, addr adjustVolumeCommand, eax
+					invoke mciSendString, addr mediaCommand, NULL, 0, NULL
+				.endif
+				;invoke MessageBox,hWin,addr wsprintftest, addr htxtest, MB_OK
+				
+			.elseif ax == SB_ENDSCROLL
+			
+			;invoke wsprintf,addr wsprintftest,addr debugint,htxtesttimes
+			;invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
+			invoke SendDlgItemMessage,hWin,curSlider,TBM_GETPOS,0,0
+			invoke wsprintf,addr wsprintftest,addr debugint,eax
+			invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
+			.endif
+			
+		.elseif curSlider == IDC_TimeSlider;调节进度
+			.if ax == SB_THUMBTRACK;滚动结束消息
+			inc htxtesttimes
+			;invoke MessageBox,hWin,addr wsprintftest, addr htxtest, MB_OK
+			.elseif ax == SB_ENDSCROLL
+			
+			;invoke wsprintf,addr wsprintftest,addr debugint,htxtesttimes
+			;invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
+			invoke SendDlgItemMessage,hWin,curSlider,TBM_GETPOS,0,0
+			invoke wsprintf,addr wsprintftest,addr debugint,eax
+			invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
+			.endif
+		.endif
+		
+		
+		
 	.elseif eax == WM_COMMAND
 		mov	eax,wParam
 		.if	eax == IDB_EXIT;按下退出键
@@ -89,6 +151,16 @@ init proc hWin:DWORD
 			pop ecx
 		loop L1
 	.ENDIF
+	
+	;初始化音量条范围为0-1000，初始值为1000
+	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETRANGEMIN, 0, 0
+	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETRANGEMAX, 0, 1000
+	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETPOS, 1, 1000
+	
+	;初始化进度条范围为0-200
+	invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMIN, 0, 0
+	invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMAX, 0, 200
+	
 	Ret
 init endp
 
@@ -140,6 +212,11 @@ changeSong proc hWin:DWORD, newSongIndex: DWORD
 	invoke openSong,hWin, currentSongIndex;打开新的歌曲
 	mov currentStatus, 1;转为播放状态
 	invoke mciSendString, ADDR playSongCommand, NULL, 0, NULL;播放歌曲
+	
+	;设置音量为当前音量Slider的值
+	invoke SendDlgItemMessage,hWin,IDC_VolumeSlider,TBM_GETPOS,0,0;获取音量条游标位置
+	invoke wsprintf, addr mediaCommand, addr adjustVolumeCommand, eax
+	invoke mciSendString, addr mediaCommand, NULL, 0, NULL
 	Ret
 changeSong endp
 
