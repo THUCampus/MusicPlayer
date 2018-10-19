@@ -27,6 +27,7 @@ addSong PROTO :DWORD
 deleteSong PROTO :DWORD
 loadFile PROTO :DWORD
 saveFile PROTO :DWORD
+changeVolume PROTO	:DWORD
 
 ;¸èÇú½á¹¹Ìå
 Song STRUCT

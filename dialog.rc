@@ -12,7 +12,6 @@
 #define IDC_AddSongButton 1013
 #define IDC_SongMenu 1016
 #define IDC_DeleteSongButton 1017
-#define IDC_STATIC1018 1018
 #define IDC_VolumeSlider 1009
 
 200 ICON DISCARDABLE "bones.ico"
@@ -35,6 +34,5 @@ BEGIN
 	CONTROL "µ¼Èë¸èÇú",IDC_AddSongButton,"Button",0x50010000,377,6,64,16,0x00000000
 	CONTROL "É¾³ý¸èÇú",IDC_DeleteSongButton,"Button",0x50010000,300,6,64,16,0x00000000
 	CONTROL "",IDC_SongMenu,"ListBox",0x50210141,93,40,437,194,0x00000200
-	CONTROL "test",IDC_STATIC1018,"Static",0x50000000,17,80,67,28,0x00000000
 END
 
