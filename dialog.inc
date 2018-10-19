@@ -27,7 +27,8 @@ addSong PROTO :DWORD
 deleteSong PROTO :DWORD
 loadFile PROTO :DWORD
 saveFile PROTO :DWORD
-changeVolume PROTO	:DWORD
+changeVolume PROTO :DWORD
+displayVolume PROTO	:DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -36,22 +37,22 @@ Song STRUCT
 Song ends
 
 .const
-	IDD_MAIN		EQU 1000
-	IDB_EXIT		EQU 1001
+	IDD_MAIN			EQU 1000
+	IDB_EXIT			EQU 1001
 	IDC_PrevSong		EQU 1002;上一首歌的按钮
 	IDC_PlayButton		EQU 1003;播放按钮
 	IDC_NextSong		EQU 1004;下一首歌的按钮
 	IDC_STATIC1007		EQU 1007
 	IDC_STATIC1008		EQU 1008
 	IDC_TimeSlider		EQU 1006;时间进度条
-	IDC_VolumeSlider		EQU 1009;音量
+	IDC_VolumeSlider	EQU 1009;音量
 	IDC_SearchEdit		EQU 1010;关键词搜索输入
-	IDC_AddSongButton		EQU 1013;导入新的歌曲的按钮
+	IDC_AddSongButton	EQU 1013;导入新的歌曲的按钮
 	IDC_SongMenu		EQU 1016;歌单列表
 	IDC_DeleteSong      EQU 1017;删除歌曲
-	IDC_STATIC1018		EQU 1018;htxtest
+	IDC_VolumeDisplay	EQU 1019;音量显示
 	
-	MAX_SONG_MENU_SIZE EQU 100
+	MAX_SONG_MENU_SIZE 	EQU 100
 	
 .data	
 	openSongCommand BYTE 'open "%s" alias currentSong',0;打开歌曲命令
@@ -63,13 +64,21 @@ Song ends
 	adjustVolumeCommand BYTE "setaudio currentSong volume to %d",0;调整音量命令
 	
 	debug BYTE 'haha%s%s%dheihei',0;调试信息
-	debugint BYTE '%d',0
+	int2str BYTE '%d',0
 	htxtest BYTE "htxtest",0
 	integertest BYTE 48
 	wsprintftest BYTE 100 DUP(0)
 	htxtesttimes DWORD 0
 	curSlider DWORD ?
-
+	
+	;播放/暂停按钮文字
+	buttonPlay BYTE "播放", 0
+	buttonPause BYTE "暂停", 0
+	
+	repeatStatus BYTE 0;当前的循环模式
+	;0:列表循环
+	;1:单曲循环
+	
 	currentStatus BYTE 0;当前的播放状态
 	;0:停止状态
 	;1:播放状态
