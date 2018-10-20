@@ -5,10 +5,11 @@ INCLUDE		comctl32.inc	;windows common controls
 INCLUDE		winmm.inc
 INCLUDE		comdlg32.inc
 INCLUDE		msvcrt.inc
-
+INCLUDE 	shlwapi.inc
 ;INCLUDE song.inc
 INCLUDE msvcrt.inc
 
+INCLUDELIB  shlwapi.lib
 INCLUDELIB	user32.lib
 INCLUDELIB	kernel32.lib
 INCLUDELIB	comctl32.lib	;windows common controls
@@ -29,6 +30,8 @@ loadFile PROTO :DWORD
 saveFile PROTO :DWORD
 changeVolume PROTO :DWORD
 displayVolume PROTO	:DWORD
+changeTimeSlider PROTO  :DWORD
+changeTime PROTO  :DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -62,6 +65,8 @@ Song ends
 	closeSongCommand BYTE "close currentSong",0;关闭当前歌曲命令
 	songMenuFilename BYTE "\\song.dat",0 ;歌单保存位置
 	adjustVolumeCommand BYTE "setaudio currentSong volume to %d",0;调整音量命令
+	getLengthCommand BYTE "status currentSong length", 0;获取歌曲长度命令
+	getPositionCommand BYTE "status currentSong position", 0;获取歌曲当前播放位置命令
 	
 	debug BYTE 'haha%s%s%dheihei',0;调试信息
 	int2str BYTE '%d',0
@@ -70,6 +75,11 @@ Song ends
 	wsprintftest BYTE 100 DUP(0)
 	htxtesttimes DWORD 0
 	curSlider DWORD ?
+	songLength BYTE 32 dup(0)
+	songLengthInt DWORD 0
+	songPosition BYTE 32 dup(0)
+	sliderLength DWORD 1000
+	timeScale DWORD 1000;时间缩放倍率，从毫秒级变成秒级做运算
 	
 	;播放/暂停按钮文字
 	buttonPlay BYTE "播放", 0
