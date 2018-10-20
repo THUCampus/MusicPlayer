@@ -32,6 +32,7 @@ changeVolume PROTO :DWORD
 displayVolume PROTO	:DWORD
 changeTimeSlider PROTO  :DWORD
 changeTime PROTO  :DWORD
+repeatControl PROTO  :DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -54,8 +55,12 @@ Song ends
 	IDC_SongMenu		EQU 1016;歌单列表
 	IDC_DeleteSong      EQU 1017;删除歌曲
 	IDC_VolumeDisplay	EQU 1019;音量显示
+	IDC_PlayMode		EQU 1023;循环模式
 	
 	MAX_SONG_MENU_SIZE 	EQU 100
+	
+	SINGLE_REPEAT		EQU 0;单曲循环
+	LIST_REPEAT			EQU 1;列表循环
 	
 .data	
 	openSongCommand BYTE 'open "%s" alias currentSong',0;打开歌曲命令
@@ -68,6 +73,7 @@ Song ends
 	getLengthCommand BYTE "status currentSong length", 0;获取歌曲长度命令
 	getPositionCommand BYTE "status currentSong position", 0;获取歌曲当前播放位置命令
 	setPositionCommand BYTE "seek currentSong to %d", 0;设置歌曲当前播放位置命令
+	setPosToStartCommand BYTE "seek currentSong to start", 0;设置歌曲当前播放位置到开头
 	
 	debug BYTE 'haha%s%s%dheihei',0;调试信息
 	int2str BYTE '%d',0
@@ -81,6 +87,8 @@ Song ends
 	songPosition BYTE 32 dup(0)
 	sliderLength DWORD 1000
 	timeScale DWORD 1000;时间缩放倍率，从毫秒级变成秒级做运算
+	singleCirculation BYTE "单曲循环", 0
+	listCirculation BYTE "列表循环", 0
 	
 	;播放/暂停按钮文字
 	buttonPlay BYTE "播放", 0

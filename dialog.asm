@@ -39,7 +39,8 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 	.elseif eax == WM_TIMER;计时器消息
 		.if currentStatus == 1
 			;invoke MessageBox,hWin,addr wsprintftest, addr htxtest, MB_OK
-			invoke changeTimeSlider, hWin
+			invoke changeTimeSlider, hWin;更改进度条滑块位置
+			invoke repeatControl, hWin;检测是否已经播放完成，若已完成则根据当前循环模式播放相应的歌曲
 		.endif
 	.elseif eax == WM_HSCROLL;slider消息
 		;获取发送消息的Slider的控件号并存在curSlider变量里
@@ -150,12 +151,13 @@ init proc hWin:DWORD
 	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETRANGEMAX, 0, sliderLength
 	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETPOS, 1, sliderLength
 	
-	;初始化进度条范围为0-1000，足够支持16分钟40秒以内的音频逐秒调节进度
-	;invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMIN, 0, 0
-	;invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMAX, 0, sliderLength
-	
 	;设置计时器，每1s发送一次WM_TIMER消息，用于更新进度条
-	invoke SetTimer, hWin, 1, 1000, NULL
+	invoke SetTimer, hWin, 1, 500, NULL
+	
+	;向ComboBox里添加两项
+	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr singleCirculation
+	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr listCirculation
+	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_SETCURSEL, 0, 0;默认选中单曲循环
 	Ret
 init endp
 
@@ -208,8 +210,8 @@ playPause proc hWin:DWORD
 		invoke mciSendString, ADDR pauseSongCommand, NULL, 0, NULL;暂停歌曲
 		invoke SendDlgItemMessage, hWin, IDC_PlayButton, WM_SETTEXT, 0, addr buttonPlay;修改按钮文字
 		
-		invoke mciSendString, addr getPositionCommand, addr songPosition, 32, NULL;songPosition单位是毫秒，例：5分02秒=303601
-		invoke MessageBox,hWin,addr songPosition, addr htxtest, MB_OK
+		;invoke mciSendString, addr getPositionCommand, addr songPosition, 32, NULL;songPosition单位是毫秒，例：5分02秒=303601
+		;invoke MessageBox,hWin,addr songPosition, addr htxtest, MB_OK
 		
 	.elseif currentStatus == 2;若当前状态为暂停状态
 		mov currentStatus, 1;转为播放状态
@@ -486,5 +488,30 @@ changeTime endp
 ; hWin是窗口句柄；
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
+
+
+;-------------------------------------------------------------------------------------------------------
+; 根据进度条改变窗口中显示的数字
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+repeatControl proc hWin: DWORD
+	local temp: DWORD
+	.if currentStatus == 1;播放状态
+		invoke StrToInt, addr songLength
+		mov temp, eax
+		invoke StrToInt, addr songPosition
+		.if eax == temp;播放完了
+			invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_GETCURSEL, 0, 0;查看当前选中的项的序号，0代表单曲循环，1代表列表循环
+			.if eax == SINGLE_REPEAT;单曲循环
+				invoke mciSendString, addr setPosToStartCommand, NULL, 0, NULL;定位到歌曲开头
+				invoke mciSendString, addr playSongCommand, NULL, 0, NULL
+			.elseif eax == LIST_REPEAT;列表循环
+				invoke SendMessage, hWin, WM_COMMAND, IDC_NextSong, 0;发送消息，模拟点击了"下一首"按钮
+			.endif
+		.endif
+	.endif
+	Ret
+repeatControl endp
 
 end start
