@@ -67,6 +67,7 @@ Song ends
 	adjustVolumeCommand BYTE "setaudio currentSong volume to %d",0;调整音量命令
 	getLengthCommand BYTE "status currentSong length", 0;获取歌曲长度命令
 	getPositionCommand BYTE "status currentSong position", 0;获取歌曲当前播放位置命令
+	setPositionCommand BYTE "seek currentSong to %d", 0;设置歌曲当前播放位置命令
 	
 	debug BYTE 'haha%s%s%dheihei',0;调试信息
 	int2str BYTE '%d',0
