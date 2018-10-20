@@ -5,11 +5,6 @@ option	casemap :none
 
 include		dialog.inc
 
-;18/10/19 todo list:
-;用分钟：秒的形式显示当前进度
-;实现单曲循环（直接用mci命令）
-;实现列表循环（写个函数）
-
 .code
 start:
 	invoke	GetModuleHandle, NULL
@@ -25,20 +20,13 @@ start:
 ;-------------------------------------------------------------------------------------------------------
 DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 	mov	eax,uMsg
-	
 	.if	eax == WM_INITDIALOG;初始化界面
 		invoke loadFile, hWin
 		invoke init, hWin
 		invoke	LoadIcon,hInstance,200
 		invoke	SendMessage, hWin, WM_SETICON, 1, eax
-		
-		;htxtest
-		;invoke wsprintf,addr wsprintftest,addr debug,addr playSongCommand,addr playSongCommand,integertest
-		;invoke MessageBox,hWin,addr wsprintftest, addr htxtest, MB_OK
-		;htxtest over
 	.elseif eax == WM_TIMER;计时器消息
 		.if currentStatus == 1
-			;invoke MessageBox,hWin,addr wsprintftest, addr htxtest, MB_OK
 			invoke changeTimeSlider, hWin;更改进度条滑块位置
 			invoke repeatControl, hWin;检测是否已经播放完成，若已完成则根据当前循环模式播放相应的歌曲
 		.endif
@@ -60,9 +48,6 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 					invoke changeVolume,hWin
 				.endif
 				invoke displayVolume, hWin;设置文字显示音量
-			;invoke SendDlgItemMessage,hWin,curSlider,TBM_GETPOS,0,0
-			;invoke wsprintf,addr wsprintftest,addr int2str,eax
-			;invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
 			.endif
 			
 		.elseif curSlider == IDC_TimeSlider;调节进度
@@ -71,17 +56,8 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 				.if eax != -1;当前有歌曲被选中，则发送mcisendstring命令调整进度
 					invoke changeTime, hWin
 				.endif
-			
-			;invoke wsprintf,addr wsprintftest,addr int2str,htxtesttimes
-			;invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
-			;invoke SendDlgItemMessage,hWin,curSlider,TBM_GETPOS,0,0
-			;invoke wsprintf,addr wsprintftest,addr int2str,eax
-			;invoke MessageBox,hWin,addr wsprintftest,addr htxtest,MB_OK
 			.endif
 		.endif
-		
-		
-		
 	.elseif eax == WM_COMMAND
 		mov	eax,wParam
 		.if	eax == IDB_EXIT;按下退出键
@@ -151,10 +127,10 @@ init proc hWin:DWORD
 	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETRANGEMAX, 0, sliderLength
 	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETPOS, 1, sliderLength
 	
-	;设置计时器，每1s发送一次WM_TIMER消息，用于更新进度条
+	;设置计时器，每0.5s发送一次计时器消息
 	invoke SetTimer, hWin, 1, 500, NULL
 	
-	;向ComboBox里添加两项
+	;向ComboBox里添加两项循环模式
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr singleCirculation
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr listCirculation
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_SETCURSEL, 0, 0;默认选中单曲循环
@@ -182,7 +158,6 @@ openSong endp
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 playPause proc hWin:DWORD
-	local htxlocal:DWORD
 	.if currentStatus == 0;若当前状态为停止状态
 		mov currentStatus, 1;转为播放状态
 		invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_SETCURSEL, currentSongIndex, 0;改变选中项
@@ -192,26 +167,22 @@ playPause proc hWin:DWORD
 		invoke SendDlgItemMessage, hWin, IDC_PlayButton, WM_SETTEXT, 0, addr buttonPause;修改按钮文字
 		
 		invoke mciSendString, addr getLengthCommand, addr songLength, 32, NULL;songLength单位是毫秒，例：5分02秒=303601
-		;invoke MessageBox,hWin,addr songLength, addr htxtest, MB_OK
 		invoke StrToInt, addr songLength
-		mov htxlocal, eax
+		invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMAX, 0, eax;把进度条改成跟歌曲长度（毫秒数）一样长
+		
+		;计算当前歌曲的时长（分钟和秒表示）
+		invoke StrToInt, addr songLength
 		mov edx, 0
 		div timeScale
-		mov songLengthInt, eax
-		invoke wsprintf, addr htxtest,addr int2str, songLengthInt
-		;invoke MessageBox,hWin,addr htxtest, addr htxtest, MB_OK
-		
-		;invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMAX, 0, songLengthInt;把进度条改成跟歌曲长度（秒数）一样长
-		invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMAX, 0, htxlocal;把进度条改成跟歌曲长度（秒数）一样长
-		
-		
+	
+		mov edx, 0
+		div timeScaleSec
+		mov timeMinuteLength, eax
+		mov timeSecondLength, edx
 	.elseif currentStatus == 1;若当前状态为播放状态
 		mov currentStatus, 2;转为暂停状态
 		invoke mciSendString, ADDR pauseSongCommand, NULL, 0, NULL;暂停歌曲
 		invoke SendDlgItemMessage, hWin, IDC_PlayButton, WM_SETTEXT, 0, addr buttonPlay;修改按钮文字
-		
-		;invoke mciSendString, addr getPositionCommand, addr songPosition, 32, NULL;songPosition单位是毫秒，例：5分02秒=303601
-		;invoke MessageBox,hWin,addr songPosition, addr htxtest, MB_OK
 		
 	.elseif currentStatus == 2;若当前状态为暂停状态
 		mov currentStatus, 1;转为播放状态
@@ -240,7 +211,17 @@ changeSong proc hWin:DWORD, newSongIndex: DWORD
 	;设置时间进度条最大长度为歌曲长度(毫秒)
 	invoke mciSendString, addr getLengthCommand, addr songLength, 32, NULL;songLength单位为毫秒
 	invoke StrToInt, addr songLength
-	invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMAX, 0, eax;把进度条改成跟歌曲长度（秒数）一样长
+	invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETRANGEMAX, 0, eax;把进度条改成跟歌曲长度（毫秒数）一样长
+	
+	;计算当前歌曲的时长（分钟和秒表示）
+	invoke StrToInt, addr songLength
+	mov edx, 0
+	div timeScale
+	
+	mov edx, 0
+	div timeScaleSec
+	mov timeMinuteLength, eax
+	mov timeSecondLength, edx
 	Ret
 changeSong endp
 
@@ -454,10 +435,13 @@ displayVolume endp
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 changeTimeSlider proc hWin: DWORD
+	local temp: DWORD
 	.if currentStatus == 1;若当前为播放状态
 		invoke mciSendString, addr getPositionCommand, addr songPosition, 32, NULL;获取当前播放位置
 		invoke StrToInt, addr songPosition;当前进度转成int存在eax里
-		invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETPOS, 1, eax
+		mov temp, eax
+		invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETPOS, 1, temp
+		invoke displayTime, hWin, temp
 	.endif
 	Ret
 changeTimeSlider endp
@@ -482,13 +466,25 @@ changeTime proc hWin: DWORD
 	Ret
 changeTime endp
 
-
 ;-------------------------------------------------------------------------------------------------------
 ; 根据进度条改变窗口中显示的数字
-; hWin是窗口句柄；
+; hWin是窗口句柄, currentPosition是当前播放位置（整数；单位：毫秒）
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
-
+displayTime proc hWin: DWORD, currentPosition: DWORD
+	;计算当前歌曲的进度（分钟和秒表示）
+	mov eax, currentPosition
+	mov edx, 0
+	div timeScale
+	
+	mov edx, 0
+	div timeScaleSec
+	mov timeMinutePosition, eax
+	mov timeSecondPosition, edx
+	invoke wsprintf, addr mediaCommand, addr timeDisplay, timeMinutePosition, timeSecondPosition, timeMinuteLength, timeSecondLength
+	invoke SendDlgItemMessage, hWin, IDC_TimeDisplay, WM_SETTEXT, 0, addr mediaCommand;修改文字 
+	Ret
+displayTime endp
 
 ;-------------------------------------------------------------------------------------------------------
 ; 根据进度条改变窗口中显示的数字

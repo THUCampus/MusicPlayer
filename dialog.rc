@@ -15,6 +15,7 @@
 #define IDC_VolumeSlider 1009
 #define IDC_VolumeDisplay 1019
 #define IDC_PlayMode 1023
+#define IDC_TimeDisplay 1024
 
 200 ICON DISCARDABLE "bones.ico"
 
@@ -38,5 +39,6 @@ BEGIN
 	CONTROL "",IDC_SongMenu,"ListBox",0x50210141,93,40,437,194,0x00000200
 	CONTROL "100",IDC_VolumeDisplay,"Static",0x50000000,400,265,27,16,0x00000000
 	CONTROL "123",IDC_PlayMode,"ComboBox",0x50010003,473,250,61,56,0x00000000
+	CONTROL "0:0/0:0",IDC_TimeDisplay,"Static",0x50000000,169,265,51,10,0x00000000
 END
 

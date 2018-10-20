@@ -33,6 +33,7 @@ displayVolume PROTO	:DWORD
 changeTimeSlider PROTO  :DWORD
 changeTime PROTO  :DWORD
 repeatControl PROTO  :DWORD
+displayTime PROTO  :DWORD, :DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -56,6 +57,7 @@ Song ends
 	IDC_DeleteSong      EQU 1017;删除歌曲
 	IDC_VolumeDisplay	EQU 1019;音量显示
 	IDC_PlayMode		EQU 1023;循环模式
+	IDC_TimeDisplay		EQU 1024;进度显示
 	
 	MAX_SONG_MENU_SIZE 	EQU 100
 	
@@ -75,21 +77,23 @@ Song ends
 	setPositionCommand BYTE "seek currentSong to %d", 0;设置歌曲当前播放位置命令
 	setPosToStartCommand BYTE "seek currentSong to start", 0;设置歌曲当前播放位置到开头
 	
-	debug BYTE 'haha%s%s%dheihei',0;调试信息
-	int2str BYTE '%d',0
-	htxtest BYTE "htxtest",0
-	integertest BYTE 48
-	wsprintftest BYTE 100 DUP(0)
-	htxtesttimes DWORD 0
-	curSlider DWORD ?
-	songLength BYTE 32 dup(0)
-	songLengthInt DWORD 0
-	songPosition BYTE 32 dup(0)
-	sliderLength DWORD 1000
-	timeScale DWORD 1000;时间缩放倍率，从毫秒级变成秒级做运算
+	debug BYTE '%d',0;调试信息
+	int2str BYTE '%d',0;int转str辅助用
+	curSlider DWORD ?;当前发送消息的进度条
+	songLength BYTE 32 dup(0);当前歌曲长度（单位：毫秒）
+	songPosition BYTE 32 dup(0);当前播放进度（单位：毫秒）
+	sliderLength DWORD 1000;音量条长度
 	singleCirculation BYTE "单曲循环", 0
 	listCirculation BYTE "列表循环", 0
+	timeScale DWORD 1000;秒和毫秒进制
+	timeScaleSec DWORD 60;秒和分钟进制
+	timeMinutePosition DWORD 0;当前歌曲长度（分钟取整）
+	timeSecondPosition DWORD 0;当前歌曲长度（秒取整）
+	timeMinuteLength DWORD 0;当前歌曲进度（分钟取整）
+	timeSecondLength DWORD 0;当前歌曲进度（秒取整）
+	timeDisplay BYTE "%d:%d/%d:%d", 0;用于进度显示
 	
+		
 	;播放/暂停按钮文字
 	buttonPlay BYTE "播放", 0
 	buttonPause BYTE "暂停", 0
