@@ -5,16 +5,17 @@ INCLUDE		comctl32.inc	;windows common controls
 INCLUDE		winmm.inc
 INCLUDE		comdlg32.inc
 INCLUDE		msvcrt.inc
+INCLUDE 	shlwapi.inc
+INCLUDE 	msvcrt.inc
 
-;INCLUDE song.inc
-INCLUDE msvcrt.inc
-
+INCLUDELIB  shlwapi.lib
 INCLUDELIB	user32.lib
 INCLUDELIB	kernel32.lib
 INCLUDELIB	comctl32.lib	;windows common controls
 INCLUDELIB	winmm.lib
 INCLUDELIB	msvcrt.lib
 INCLUDELIB  comdlg32.lib
+
 
 ;请将函数声明写在此处
 DlgProc		PROTO	:DWORD,:DWORD,:DWORD,:DWORD
@@ -27,6 +28,14 @@ addSong PROTO :DWORD
 deleteSong PROTO :DWORD
 loadFile PROTO :DWORD
 saveFile PROTO :DWORD
+changeVolume PROTO :DWORD
+displayVolume PROTO	:DWORD
+changeTimeSlider PROTO  :DWORD
+changeTime PROTO  :DWORD
+repeatControl PROTO  :DWORD
+displayTime PROTO  :DWORD, :DWORD
+
+accDecoder PROTO: DWORD, :DWORD;将acc解码成wav
 
 ;歌曲结构体
 Song STRUCT
@@ -35,21 +44,27 @@ Song STRUCT
 Song ends
 
 .const
-	IDD_MAIN		EQU 1000
-	IDB_EXIT		EQU 1001
+	IDD_MAIN			EQU 1000
+	IDB_EXIT			EQU 1001
 	IDC_PrevSong		EQU 1002;上一首歌的按钮
 	IDC_PlayButton		EQU 1003;播放按钮
 	IDC_NextSong		EQU 1004;下一首歌的按钮
 	IDC_STATIC1007		EQU 1007
 	IDC_STATIC1008		EQU 1008
 	IDC_TimeSlider		EQU 1006;时间进度条
-	IDC_VolumnSlider		EQU 1009;音量
+	IDC_VolumeSlider	EQU 1009;音量
 	IDC_SearchEdit		EQU 1010;关键词搜索输入
-	IDC_AddSongButton		EQU 1013;导入新的歌曲的按钮
+	IDC_AddSongButton	EQU 1013;导入新的歌曲的按钮
 	IDC_SongMenu		EQU 1016;歌单列表
 	IDC_DeleteSong      EQU 1017;删除歌曲
+	IDC_VolumeDisplay	EQU 1019;音量显示
+	IDC_PlayMode		EQU 1023;循环模式
+	IDC_TimeDisplay		EQU 1024;进度显示
 	
-	MAX_SONG_MENU_SIZE EQU 100
+	MAX_SONG_MENU_SIZE 	EQU 100
+	
+	SINGLE_REPEAT		EQU 0;单曲循环
+	LIST_REPEAT			EQU 1;列表循环
 	
 .data	
 	openSongCommand BYTE 'open "%s" alias currentSong',0;打开歌曲命令
@@ -58,9 +73,37 @@ Song ends
 	resumeSongCommand BYTE "resume currentSong",0;恢复歌曲播放命令
 	closeSongCommand BYTE "close currentSong",0;关闭当前歌曲命令
 	songMenuFilename BYTE "\\song.dat",0 ;歌单保存位置
+	adjustVolumeCommand BYTE "setaudio currentSong volume to %d",0;调整音量命令
+	getLengthCommand BYTE "status currentSong length", 0;获取歌曲长度命令
+	getPositionCommand BYTE "status currentSong position", 0;获取歌曲当前播放位置命令
+	setPositionCommand BYTE "seek currentSong to %d", 0;设置歌曲当前播放位置命令
+	setPosToStartCommand BYTE "seek currentSong to start", 0;设置歌曲当前播放位置到开头
 	
-	debug BYTE "%d",0;调试信息
-
+	debug BYTE '%d',0;调试信息
+	int2str BYTE '%d',0;int转str辅助用
+	curSlider DWORD ?;当前发送消息的进度条
+	songLength BYTE 32 dup(0);当前歌曲长度（单位：毫秒）
+	songPosition BYTE 32 dup(0);当前播放进度（单位：毫秒）
+	sliderLength DWORD 1000;音量条长度
+	singleCirculation BYTE "单曲循环", 0
+	listCirculation BYTE "列表循环", 0
+	timeScale DWORD 1000;秒和毫秒进制
+	timeScaleSec DWORD 60;秒和分钟进制
+	timeMinutePosition DWORD 0;当前歌曲长度（分钟取整）
+	timeSecondPosition DWORD 0;当前歌曲长度（秒取整）
+	timeMinuteLength DWORD 0;当前歌曲进度（分钟取整）
+	timeSecondLength DWORD 0;当前歌曲进度（秒取整）
+	timeDisplay BYTE "%d:%d/%d:%d", 0;用于进度显示
+	
+		
+	;播放/暂停按钮文字
+	buttonPlay BYTE "播放", 0
+	buttonPause BYTE "暂停", 0
+	
+	repeatStatus BYTE 0;当前的循环模式
+	;0:列表循环
+	;1:单曲循环
+	
 	currentStatus BYTE 0;当前的播放状态
 	;0:停止状态
 	;1:播放状态
@@ -69,7 +112,7 @@ Song ends
 	
 	;---歌单信息,将其内容写在文件中---
 	songMenu Song 100 dup(<"1", "1">)
-	songMenuSize DWORD 0;歌单大小
+	songMenuSize DWORD 0;歌单大小】
 	;---歌单信息---
 	
 	;---打开文件对话框---
