@@ -6,8 +6,7 @@ INCLUDE		winmm.inc
 INCLUDE		comdlg32.inc
 INCLUDE		msvcrt.inc
 INCLUDE 	shlwapi.inc
-;INCLUDE song.inc
-INCLUDE msvcrt.inc
+INCLUDE 	msvcrt.inc
 
 INCLUDELIB  shlwapi.lib
 INCLUDELIB	user32.lib
@@ -16,6 +15,7 @@ INCLUDELIB	comctl32.lib	;windows common controls
 INCLUDELIB	winmm.lib
 INCLUDELIB	msvcrt.lib
 INCLUDELIB  comdlg32.lib
+
 
 ;请将函数声明写在此处
 DlgProc		PROTO	:DWORD,:DWORD,:DWORD,:DWORD
@@ -34,6 +34,8 @@ changeTimeSlider PROTO  :DWORD
 changeTime PROTO  :DWORD
 repeatControl PROTO  :DWORD
 displayTime PROTO  :DWORD, :DWORD
+
+accDecoder PROTO: DWORD, :DWORD;将acc解码成wav
 
 ;歌曲结构体
 Song STRUCT

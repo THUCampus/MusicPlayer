@@ -12,7 +12,7 @@ RCToObj=
 Assemble=/c /coff /Cp /nologo
 Link=/SUBSYSTEM:WINDOWS /RELEASE /VERSION:4.0
 Out=
-DebAssemble=/Zi /Zd /c /coff /Cp /nologo
+DebAssemble=/c /coff /Cp /nologo /Fm /Zi /Zd
 DebLink=/SUBSYSTEM:WINDOWS /DEBUG /DEBUGTYPE:CV /VERSION:4.0 /INCREMENTAL:NO
 DebOut=
 [SHOWFILE]
@@ -23,3 +23,4 @@ DebOut=
 1=dialog.asm
 2=dialog.inc
 3=dialog.rc
+4=*accDecoder.asm

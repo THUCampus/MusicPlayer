@@ -3,7 +3,7 @@
 .model	flat, stdcall
 option	casemap :none
 
-include		dialog.inc
+INCLUDE		dialog.inc
 
 .code
 start:
@@ -134,6 +134,7 @@ init proc hWin:DWORD
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr singleCirculation
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr listCirculation
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_SETCURSEL, 0, 0;默认选中单曲循环
+	
 	Ret
 init endp
 
