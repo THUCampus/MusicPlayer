@@ -61,6 +61,16 @@ Song ends
 	IDC_PlayMode		EQU 1023;循环模式
 	IDC_TimeDisplay		EQU 1024;进度显示
 	
+	IDC_PlayImage		EQU 1025;播放键的图片
+	IDC_PrevImage		EQU 1028;上一首歌的图片
+	IDC_NextImage		EQU 1029;下一首歌的图片
+	IDC_ImportImage		EQU 1030;载入本地歌曲的图片
+	IDC_TrashImage		EQU 1031;删除歌曲的图片
+	IDC_SearchImage		EQU 1032;查询按钮
+	IDC_LyricsImage		EQU 1033;歌词按钮
+	IDC_VolumeImage		EQU 1034;音量按钮
+
+	
 	MAX_SONG_MENU_SIZE 	EQU 100
 	
 	SINGLE_REPEAT		EQU 0;单曲循环
