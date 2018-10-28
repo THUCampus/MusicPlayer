@@ -134,7 +134,7 @@ init proc hWin:DWORD
 	;设置计时器，每0.5s发送一次计时器消息
 	invoke SetTimer, hWin, 1, 500, NULL
 	
-	;一开始为暂停状态
+	;暂停状态
 	invoke changePlayButton,hWin, 0
 	
 	;非静音
@@ -445,7 +445,7 @@ changeVolume endp
 
 
 ;-------------------------------------------------------------------------------------------------------
-; 改变静音按钮
+; 刷新静音按钮的视图显示
 ; Receives: hWin是窗口句柄；playing=1表示接下来有声音，=0表示接下来没有声音
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
@@ -469,11 +469,10 @@ changeSilenceButton endp
 changeSilencState proc hWin: DWORD
 	.if hasSound == 1
 		mov hasSound, 0
-		invoke changeSilenceButton,hWin, hasSound
 	.else
 		mov hasSound,1
-		invoke changeSilenceButton,hWin,hasSound
 	.endif
+	invoke changeSilenceButton,hWin, hasSound
 	invoke changeVolume,hWin
 	Ret
 changeSilencState endp
@@ -569,7 +568,7 @@ changeRecycleState endp
 
 
 ;-------------------------------------------------------------------------------------------------------
-; 改变循环按钮
+;刷新循环按钮的视图显示
 ; Receives: hWin是窗口句柄；
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
