@@ -62,7 +62,7 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 		mov	eax,wParam
 		.if	eax == IDB_EXIT;按下退出键
 			invoke	SendMessage, hWin, WM_CLOSE, 0, 0
-		.elseif eax == IDC_AddSongButton;按下导入歌曲键
+		.elseif eax == IDC_ImportImage;按下导入歌曲键
 			invoke addSong, hWin
 		.elseif songMenuSize == 0;若干歌单大小为0
 			Ret;则下述操作都不进行！！！
@@ -74,7 +74,7 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 				invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_GETCURSEL, 0, 0;则获取被选中的下标
 				invoke changeSong,hWin,eax;改变歌曲
 			.endif
-		.elseif eax == IDC_PrevSong;若点击上一首歌
+		.elseif eax == IDC_PrevImage;若点击上一首歌
 			.if currentSongIndex == 0
 				mov eax, songMenuSize
 				mov currentSongIndex,eax
@@ -82,7 +82,7 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			dec currentSongIndex
 			invoke SendDlgItemMessage,hWin, IDC_SongMenu, LB_SETCURSEL, currentSongIndex, 0;改变选中项
 			invoke changeSong,hWin,currentSongIndex;播放该首歌曲
-		.elseif eax == IDC_NextSong;若点击下一首歌
+		.elseif eax == IDC_NextImage;若点击下一首歌
 			inc currentSongIndex
 			mov eax, currentSongIndex
 			.if eax == songMenuSize
@@ -90,8 +90,10 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			.endif
 			invoke SendDlgItemMessage,hWin, IDC_SongMenu, LB_SETCURSEL, currentSongIndex, 0;改变选中项
 			invoke changeSong,hWin,currentSongIndex;播放该首歌曲
-		.elseif eax == IDC_DeleteSong
+		.elseif eax == IDC_TrashImage
 			invoke deleteSong, hWin
+		.elseif eax == IDC_SilenceButton;按下静音按钮
+			invoke changeSilencState,hWin
 		.endif
 		
 	.elseif	eax == WM_CLOSE;程序退出时执行
@@ -135,6 +137,9 @@ init proc hWin:DWORD
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr listCirculation
 	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_SETCURSEL, 0, 0;默认选中单曲循环
 	
+	invoke changePlayButton,hWin, 0
+	mov hasSound, 1
+	invoke changeSilenceButton,hWin,hasSound
 	Ret
 init endp
 
@@ -154,6 +159,23 @@ openSong proc hWin:DWORD, index:DWORD
 openSong endp
 
 ;-------------------------------------------------------------------------------------------------------
+; 改变播放按钮
+; Receives: hWin是窗口句柄；playing=1表示接下来播放，=0表示接下来不播放
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+changePlayButton proc hWin:DWORD, playing:BYTE
+	.if playing == 0;转到暂停状态
+		mov eax, 300
+	.else;转到播放状态
+		mov eax, 301
+	.endif
+	invoke LoadImage, hInstance, eax,IMAGE_ICON,32,32,NULL
+	invoke SendDlgItemMessage,hWin,IDC_PlayButton, BM_SETIMAGE, IMAGE_ICON, eax;修改按钮
+	Ret
+changePlayButton endp
+
+
+;-------------------------------------------------------------------------------------------------------
 ; 点击播放/暂停按钮时响应
 ; Receives: hWin是窗口句柄；
 ; Returns: none
@@ -165,7 +187,7 @@ playPause proc hWin:DWORD
 		invoke openSong,hWin, currentSongIndex;
 		invoke mciSendString, ADDR playSongCommand, NULL, 0, NULL;播放歌曲
 		invoke changeVolume,hWin;改变音量
-		invoke SendDlgItemMessage, hWin, IDC_PlayButton, WM_SETTEXT, 0, addr buttonPause;修改按钮文字
+		invoke changePlayButton,hWin,1
 		
 		invoke mciSendString, addr getLengthCommand, addr songLength, 32, NULL;songLength单位是毫秒，例：5分02秒=303601
 		invoke StrToInt, addr songLength
@@ -182,13 +204,13 @@ playPause proc hWin:DWORD
 		mov timeSecondLength, edx
 	.elseif currentStatus == 1;若当前状态为播放状态
 		mov currentStatus, 2;转为暂停状态
-		invoke mciSendString, ADDR pauseSongCommand, NULL, 0, NULL;暂停歌曲
-		invoke SendDlgItemMessage, hWin, IDC_PlayButton, WM_SETTEXT, 0, addr buttonPlay;修改按钮文字
+		invoke mciSendString, ADDR pauseSongCommand, NULL, 0, NULL;暂停歌曲	
+		invoke changePlayButton, hWin, 0
 		
 	.elseif currentStatus == 2;若当前状态为暂停状态
 		mov currentStatus, 1;转为播放状态
 		invoke mciSendString, ADDR resumeSongCommand, NULL, 0, NULL;恢复歌曲播放
-		invoke SendDlgItemMessage, hWin, IDC_PlayButton, WM_SETTEXT, 0, addr buttonPause;修改按钮文字
+		invoke changePlayButton,hWin,1
 	.endif
 	Ret
 playPause endp
@@ -205,7 +227,7 @@ changeSong proc hWin:DWORD, newSongIndex: DWORD
 	mov currentSongIndex, eax
 	invoke openSong,hWin, currentSongIndex;打开新的歌曲
 	mov currentStatus, 1;转为播放状态
-	invoke SendDlgItemMessage, hWin, IDC_PlayButton, WM_SETTEXT, 0, addr buttonPause;修改按钮文字
+	invoke changePlayButton,hWin,1
 	invoke mciSendString, ADDR playSongCommand, NULL, 0, NULL;播放歌曲
 	invoke changeVolume,hWin;设置音量为当前音量Slider的值
 	
@@ -408,10 +430,49 @@ deleteSong endp
 ;-------------------------------------------------------------------------------------------------------
 changeVolume proc hWin:	DWORD
 	invoke SendDlgItemMessage,hWin,IDC_VolumeSlider,TBM_GETPOS,0,0;获取当前Slider游标位置
-	invoke wsprintf, addr mediaCommand, addr adjustVolumeCommand, eax
+	.if hasSound == 1
+		invoke wsprintf, addr mediaCommand, addr adjustVolumeCommand, eax
+	.else
+		invoke wsprintf, addr mediaCommand, addr adjustVolumeCommand, 0
+	.endif
 	invoke mciSendString, addr mediaCommand, NULL, 0, NULL
 	Ret
 changeVolume endp
+
+
+;-------------------------------------------------------------------------------------------------------
+; 改变静音按钮
+; Receives: hWin是窗口句柄；playing=1表示接下来有声音，=0表示接下来没有声音
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+changeSilenceButton proc hWin:DWORD, _hasSound:BYTE
+	.if _hasSound == 0;转到暂停状态
+		mov eax, 305
+	.else;转到播放状态
+		mov eax, 304
+	.endif
+	invoke LoadImage, hInstance, eax,IMAGE_ICON,32,32,NULL
+	invoke SendDlgItemMessage,hWin,IDC_SilenceButton, BM_SETIMAGE, IMAGE_ICON, eax;修改按钮
+	Ret
+changeSilenceButton endp
+
+
+;-------------------------------------------------------------------------------------------------------
+; 切换是否为静音的状态
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+changeSilencState proc hWin: DWORD
+	.if hasSound == 1
+		mov hasSound, 0
+		invoke changeSilenceButton,hWin, hasSound
+	.else
+		mov hasSound,1
+		invoke changeSilenceButton,hWin,hasSound
+	.endif
+	invoke changeVolume,hWin
+	Ret
+changeSilencState endp
 
 ;-------------------------------------------------------------------------------------------------------
 ; 改变音量显示的数值
@@ -504,7 +565,7 @@ repeatControl proc hWin: DWORD
 				invoke mciSendString, addr setPosToStartCommand, NULL, 0, NULL;定位到歌曲开头
 				invoke mciSendString, addr playSongCommand, NULL, 0, NULL
 			.elseif eax == LIST_REPEAT;列表循环
-				invoke SendMessage, hWin, WM_COMMAND, IDC_NextSong, 0;发送消息，模拟点击了"下一首"按钮
+				invoke SendMessage, hWin, WM_COMMAND, IDC_NextImage, 0;发送消息，模拟点击了"下一首"按钮
 			.endif
 		.endif
 	.endif

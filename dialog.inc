@@ -36,6 +36,10 @@ repeatControl PROTO  :DWORD
 displayTime PROTO  :DWORD, :DWORD
 
 accDecoder PROTO: DWORD, :DWORD;将acc解码成wav
+changePlayButton PROTO :DWORD, :BYTE
+
+changeSilenceButton PROTO :DWORD, :BYTE
+changeSilencState PROTO : DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -46,22 +50,22 @@ Song ends
 .const
 	IDD_MAIN			EQU 1000
 	IDB_EXIT			EQU 1001
-	IDC_PrevSong		EQU 1002;上一首歌的按钮
+	;IDC_PrevSong		EQU 1002;上一首歌的按钮
 	IDC_PlayButton		EQU 1003;播放按钮
-	IDC_NextSong		EQU 1004;下一首歌的按钮
+	;IDC_NextSong		EQU 1004;下一首歌的按钮
 	IDC_STATIC1007		EQU 1007
 	IDC_STATIC1008		EQU 1008
 	IDC_TimeSlider		EQU 1006;时间进度条
 	IDC_VolumeSlider	EQU 1009;音量
 	IDC_SearchEdit		EQU 1010;关键词搜索输入
-	IDC_AddSongButton	EQU 1013;导入新的歌曲的按钮
+	;IDC_AddSongButton	EQU 1013;导入新的歌曲的按钮
 	IDC_SongMenu		EQU 1016;歌单列表
-	IDC_DeleteSong      EQU 1017;删除歌曲
+	;IDC_DeleteSong      EQU 1017;删除歌曲
 	IDC_VolumeDisplay	EQU 1019;音量显示
 	IDC_PlayMode		EQU 1023;循环模式
 	IDC_TimeDisplay		EQU 1024;进度显示
 	
-	IDC_PlayImage		EQU 1025;播放键的图片
+	;IDC_PlayImage		EQU 1025;播放键的图片
 	IDC_PrevImage		EQU 1028;上一首歌的图片
 	IDC_NextImage		EQU 1029;下一首歌的图片
 	IDC_ImportImage		EQU 1030;载入本地歌曲的图片
@@ -69,7 +73,8 @@ Song ends
 	IDC_SearchImage		EQU 1032;查询按钮
 	IDC_LyricsImage		EQU 1033;歌词按钮
 	IDC_VolumeImage		EQU 1034;音量按钮
-
+	IDC_SilenceButton		EQU 1043;静音按钮
+	IDC_RecycleButton		EQU 1044;循环模式按钮
 	
 	MAX_SONG_MENU_SIZE 	EQU 100
 	
@@ -138,9 +143,12 @@ Song ends
 	szWarningTitle BYTE 'Warning', 0
 	szWarning BYTE '请选择要删除的歌曲', 0
 	;---打开文件对话框---
-
+	
+	hasSound BYTE 1;是否有声音
+	
 .data?
 	hInstance	dd	?
 	mediaCommand BYTE ?; 多媒体控制命令(mciSendString需要附加参数时使用）
+	hButton dd ?
 
  
