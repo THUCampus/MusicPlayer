@@ -94,6 +94,8 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			invoke deleteSong, hWin
 		.elseif eax == IDC_SilenceButton;按下静音按钮
 			invoke changeSilencState,hWin
+		.elseif eax == IDC_RecycleButton;按下循环按钮
+			invoke changeRecycleState,hWin
 		.endif
 		
 	.elseif	eax == WM_CLOSE;程序退出时执行
@@ -132,14 +134,16 @@ init proc hWin:DWORD
 	;设置计时器，每0.5s发送一次计时器消息
 	invoke SetTimer, hWin, 1, 500, NULL
 	
-	;向ComboBox里添加两项循环模式
-	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr singleCirculation
-	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_ADDSTRING, 0, addr listCirculation
-	invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_SETCURSEL, 0, 0;默认选中单曲循环
-	
+	;一开始为暂停状态
 	invoke changePlayButton,hWin, 0
+	
+	;非静音
 	mov hasSound, 1
 	invoke changeSilenceButton,hWin,hasSound
+	
+	;循环播放状态
+	mov repeatStatus,LIST_REPEAT
+	invoke changeRecycleButton,hWin
 	Ret
 init endp
 
@@ -549,6 +553,39 @@ displayTime proc hWin: DWORD, currentPosition: DWORD
 displayTime endp
 
 ;-------------------------------------------------------------------------------------------------------
+; 切换循环状态
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+changeRecycleState proc hWin: DWORD
+	.if repeatStatus == SINGLE_REPEAT
+		mov repeatStatus, LIST_REPEAT
+	.else
+		mov repeatStatus,SINGLE_REPEAT
+	.endif
+	invoke changeRecycleButton,hWin
+	Ret
+changeRecycleState endp
+
+
+;-------------------------------------------------------------------------------------------------------
+; 改变循环按钮
+; Receives: hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+changeRecycleButton proc hWin:DWORD
+	.if repeatStatus == SINGLE_REPEAT;单曲循环
+		mov eax, 307
+	.else;全部循环
+		mov eax, 306
+	.endif
+	invoke LoadImage, hInstance, eax,IMAGE_ICON,32,32,NULL
+	invoke SendDlgItemMessage,hWin,IDC_RecycleButton, BM_SETIMAGE, IMAGE_ICON, eax;修改按钮
+	Ret
+changeRecycleButton endp
+
+
+;-------------------------------------------------------------------------------------------------------
 ; 根据进度条改变窗口中显示的数字
 ; hWin是窗口句柄；
 ; Returns: none
@@ -560,11 +597,10 @@ repeatControl proc hWin: DWORD
 		mov temp, eax
 		invoke StrToInt, addr songPosition
 		.if eax == temp;播放完了
-			invoke SendDlgItemMessage, hWin, IDC_PlayMode, CB_GETCURSEL, 0, 0;查看当前选中的项的序号，0代表单曲循环，1代表列表循环
-			.if eax == SINGLE_REPEAT;单曲循环
+			.if repeatStatus == SINGLE_REPEAT;单曲循环
 				invoke mciSendString, addr setPosToStartCommand, NULL, 0, NULL;定位到歌曲开头
 				invoke mciSendString, addr playSongCommand, NULL, 0, NULL
-			.elseif eax == LIST_REPEAT;列表循环
+			.elseif repeatStatus == LIST_REPEAT;列表循环
 				invoke SendMessage, hWin, WM_COMMAND, IDC_NextImage, 0;发送消息，模拟点击了"下一首"按钮
 			.endif
 		.endif

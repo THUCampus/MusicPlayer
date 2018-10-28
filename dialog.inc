@@ -41,6 +41,9 @@ changePlayButton PROTO :DWORD, :BYTE
 changeSilenceButton PROTO :DWORD, :BYTE
 changeSilencState PROTO : DWORD
 
+changeRecycleButton PROTO :DWORD
+changeRecycleState PROTO : DWORD
+
 ;歌曲结构体
 Song STRUCT
 	_name BYTE 100 DUP(0);歌曲名
@@ -62,7 +65,7 @@ Song ends
 	IDC_SongMenu		EQU 1016;歌单列表
 	;IDC_DeleteSong      EQU 1017;删除歌曲
 	IDC_VolumeDisplay	EQU 1019;音量显示
-	IDC_PlayMode		EQU 1023;循环模式
+	;IDC_PlayMode		EQU 1023;循环模式
 	IDC_TimeDisplay		EQU 1024;进度显示
 	
 	;IDC_PlayImage		EQU 1025;播放键的图片
@@ -72,7 +75,7 @@ Song ends
 	IDC_TrashImage		EQU 1031;删除歌曲的图片
 	IDC_SearchImage		EQU 1032;查询按钮
 	IDC_LyricsImage		EQU 1033;歌词按钮
-	IDC_VolumeImage		EQU 1034;音量按钮
+	;IDC_VolumeImage		EQU 1034;音量按钮
 	IDC_SilenceButton		EQU 1043;静音按钮
 	IDC_RecycleButton		EQU 1044;循环模式按钮
 	
