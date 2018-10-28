@@ -7,6 +7,8 @@ INCLUDE		comdlg32.inc
 INCLUDE		msvcrt.inc
 INCLUDE 	shlwapi.inc
 INCLUDE 	msvcrt.inc
+INCLUDE gdi32.inc
+INCLUDE gdiplus.inc
 
 INCLUDELIB  shlwapi.lib
 INCLUDELIB	user32.lib
@@ -15,6 +17,8 @@ INCLUDELIB	comctl32.lib	;windows common controls
 INCLUDELIB	winmm.lib
 INCLUDELIB	msvcrt.lib
 INCLUDELIB  comdlg32.lib
+INCLUDELIB gdi32.lib
+INCLUDELIB gdiplus.lib
 
 
 ;请将函数声明写在此处
@@ -50,6 +54,15 @@ Song STRUCT
 	_path BYTE 100 DUP(0);歌曲路径
 Song ends
 
+
+RGB macro red,green,blue
+	xor eax,eax
+	mov ah,blue
+	shl eax,8
+	mov ah,green
+	mov al,red
+endm
+
 .const
 	IDD_MAIN			EQU 1000
 	IDB_EXIT			EQU 1001
@@ -71,7 +84,9 @@ Song ends
 	IDC_LyricsImage		EQU 1033;歌词按钮
 	IDC_SilenceButton		EQU 1043;静音按钮
 	IDC_RecycleButton		EQU 1044;循环模式按钮
-	
+	IDC_LyricsEdit		EQU 1052;歌词显示
+	IDC_SearchSongList		EQU 1053
+
 	MAX_SONG_MENU_SIZE 	EQU 100
 	
 	SINGLE_REPEAT		EQU 0;单曲循环

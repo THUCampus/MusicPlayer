@@ -97,7 +97,6 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 		.elseif eax == IDC_RecycleButton;按下循环按钮
 			invoke changeRecycleState,hWin
 		.endif
-		
 	.elseif	eax == WM_CLOSE;程序退出时执行
 		invoke closeSong, hWin
 		invoke saveFile, hWin
@@ -144,6 +143,7 @@ init proc hWin:DWORD
 	;循环播放状态
 	mov repeatStatus,LIST_REPEAT
 	invoke changeRecycleButton,hWin
+	
 	Ret
 init endp
 
@@ -161,6 +161,7 @@ openSong proc hWin:DWORD, index:DWORD
 	invoke mciSendString, ADDR mediaCommand, NULL, 0, NULL;打开歌曲
 	Ret
 openSong endp
+
 
 ;-------------------------------------------------------------------------------------------------------
 ; 改变播放按钮
