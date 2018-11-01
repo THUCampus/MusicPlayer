@@ -9,6 +9,7 @@ INCLUDE 	shlwapi.inc
 INCLUDE 	msvcrt.inc
 INCLUDE gdi32.inc
 INCLUDE gdiplus.inc
+INCLUDE wsock32.inc
 
 INCLUDELIB  shlwapi.lib
 INCLUDELIB	user32.lib
@@ -19,7 +20,7 @@ INCLUDELIB	msvcrt.lib
 INCLUDELIB  comdlg32.lib
 INCLUDELIB gdi32.lib
 INCLUDELIB gdiplus.lib
-
+INCLUDELIB wsock32.lib
 
 ;请将函数声明写在此处
 DlgProc		PROTO	:DWORD,:DWORD,:DWORD,:DWORD
@@ -39,14 +40,23 @@ changeTime PROTO  :DWORD
 repeatControl PROTO  :DWORD
 displayTime PROTO  :DWORD, :DWORD
 
-accDecoder PROTO: DWORD, :DWORD;将acc解码成wav
-changePlayButton PROTO :DWORD, :BYTE
-
 changeSilenceButton PROTO :DWORD, :BYTE
 changeSilencState PROTO : DWORD
 
 changeRecycleButton PROTO :DWORD
 changeRecycleState PROTO : DWORD
+
+searchSong PROTO: DWORD
+changePlayButton PROTO :DWORD, :BYTE
+
+;accDecoder.asm
+;accDecoder PROTO: DWORD, :DWORD, :DWORD;将acc解码成wav
+
+
+;download_API.asm
+getWebResult PROTO url: DWORD
+getSearchResult PROTO key: DWORD
+getDownloadLink PROTO sid: DWORD
 
 ;歌曲结构体
 Song STRUCT
@@ -138,7 +148,7 @@ endm
 	
 	;---歌单信息,将其内容写在文件中---
 	songMenu Song 100 dup(<"1", "1">)
-	songMenuSize DWORD 0;歌单大小】
+	songMenuSize DWORD 0;歌单大小
 	;---歌单信息---
 	
 	;---打开文件对话框---
@@ -156,6 +166,13 @@ endm
 	;---打开文件对话框---
 	
 	hasSound BYTE 1;是否有声音
+	
+	searchInputText DB 50 DUP(0)
+	stringFormat DB "%s", 0DH, 0AH, 0DH, 0AH, 0
+	
+	test_key DB "Taylor", 0
+	
+	test_search_buf DB "/search?key=Taylor", 0
 	
 .data?
 	hInstance	dd	?

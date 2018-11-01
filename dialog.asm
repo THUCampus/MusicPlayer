@@ -96,6 +96,8 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			invoke changeSilencState,hWin
 		.elseif eax == IDC_RecycleButton;按下循环按钮
 			invoke changeRecycleState,hWin
+		.elseif eax == IDC_SearchImage;push the search button
+			invoke searchSong,hWin
 		.endif
 	.elseif	eax == WM_CLOSE;程序退出时执行
 		invoke closeSong, hWin
@@ -607,5 +609,147 @@ repeatControl proc hWin: DWORD
 	.endif
 	Ret
 repeatControl endp
+
+
+;-------------------------------------------------------------------------------------------------------
+; React when the search button is clicked
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+searchSong proc hWin: DWORD
+LOCAL threadId:DWORD
+	;decide whether the input text is empty
+	;search and display
+	invoke crt_memset, addr searchInputText, size searchInputText
+	invoke GetDlgItemText,hWin, IDC_SearchEdit, addr searchInputText, size searchInputText;//获取用户输入的关键词
+	;invoke MessageBox, hWin, addr searchInputText, addr searchInputText, MB_OK
+	;invoke getSearchResult,addr test_key;使用这句会使界面卡死
+	Ret
+searchSong endp
+
+; getSearchResult: 根据搜索关键词获取搜索结果
+; 参数: key, DWORD类型, 字符串指针, 内容为关键词
+; 返回值: eax, 搜索结果开始的位置，为字符串指针
+; 返回结果的格式为: "歌曲名和歌手#歌曲id$歌曲名和歌手#歌曲id&歌曲名和歌手#歌曲id..."共20条，同时保证歌曲名和歌曲id中没有其它的'$'和'#'
+; 特殊情况: 特殊的关键词可能导致返回结果不足20条
+getSearchResult PROC key: DWORD
+.data
+	search_head DB "/search?key=", 0
+	search_buf DB 1024 DUP(0)
+
+.code
+	; 构造搜索连接的url
+	INVOKE lstrcpy, ADDR search_buf, ADDR search_head
+	INVOKE lstrcat, ADDR search_buf, key
+	; 访问服务器并拿到结果
+	INVOKE getWebResult, ADDR search_buf
+	ret
+getSearchResult ENDP
+
+; getSearchResult: 根据搜索歌曲id获取歌曲下载链接
+; 参数: sid, DWORD类型, 字符串指针, 内容为歌曲id
+; 返回值: eax, 下载链接开始的位置，为字符串指针
+getDownloadLink PROC sid: DWORD
+.data
+	get_url_head DB "/get_url?sid=", 0
+	get_url_buf DB 1024 DUP(0)
+
+.code
+	; 构造下载连接的url
+	INVOKE lstrcpy, ADDR get_url_buf, ADDR get_url_head
+	INVOKE lstrcat, ADDR get_url_buf, sid
+	; 访问服务器并拿到结果
+	INVOKE getWebResult, ADDR get_url_buf
+	ret
+getDownloadLink ENDP
+
+; getWebResult: 连接asm.wu-c.cn服务器并获取结果
+; 参数: url, DWORD类型, 字符串指针, 内容为要访问的url
+; 返回值: eax, 返回结果开始的位置，为字符串指针
+getWebResult PROC uses esi edi url: DWORD
+	LOCAL sock_data: WSADATA
+	LOCAL s_addr: sockaddr_in
+	LOCAL sock: DWORD
+	LOCAL n: DWORD
+	LOCAL p: DWORD
+
+.data
+	server_ip DB "47.94.101.6", 0
+	request_head DB "GET ", 0
+	request_tail DB " HTTP/1.1", 0DH, 0AH, "Host: asm.wu-c.cn", 0DH, 0AH, "Connection:Close", 0DH, 0AH, 0DH, 0AH, 0
+	crlf2 DB 0DH, 0AH
+	crlf DB 0DH, 0AH, 0
+	request DB 1024 DUP(0)
+	result DB 2048 DUP(0)
+	BUFSIZE = 1024
+
+.code
+	; 初始化
+	INVOKE WSAStartup, 22h, ADDR sock_data
+
+	.IF eax != 0
+		ret
+	.ENDIF
+
+	; 设置服务器ip和端口
+	lea esi, s_addr
+	mov WORD PTR [esi], AF_INET
+	INVOKE htons, 80
+	mov WORD PTR [esi + 2], ax
+	INVOKE inet_addr, ADDR server_ip
+	mov DWORD PTR [esi + 4], eax
+
+	; 创建并连接socket
+	INVOKE socket, AF_INET, SOCK_STREAM, IPPROTO_TCP
+	mov sock, eax
+	lea esi, s_addr
+	INVOKE connect, sock, esi, SIZEOF sockaddr_in
+
+	.IF sock == -1 || sock == -2
+		ret
+	.ENDIF
+
+	; 构造http请求头
+	INVOKE lstrcpy, ADDR request, ADDR request_head
+	INVOKE lstrcat, ADDR request, url
+	INVOKE lstrcat, ADDR request, ADDR request_tail
+	INVOKE lstrlen, ADDR request
+
+	; 发送http请求
+	INVOKE send, sock, ADDR request, eax, 0
+
+	; 接受http响应结果
+	mov n, eax
+	mov esi, OFFSET result
+	.WHILE n > 0
+		INVOKE recv, sock, esi, BUFSIZE, 0
+		mov n, eax
+		add esi, n
+	.ENDW
+	; 从http响应中提取body
+	push OFFSET crlf2
+	push OFFSET result
+	call crt_strstr
+	add esp, 8
+	add eax, 4
+	push OFFSET crlf
+	push eax
+	call crt_strstr
+	add esp, 8
+	add eax, 2
+	mov p, eax
+	push OFFSET crlf
+	push p
+	call crt_strstr
+	add esp, 8
+	mov BYTE PTR [eax], 0
+
+	; 清理
+	INVOKE WSACleanup
+
+	; 保存返回结果地址到eax中
+	mov eax, p
+	ret
+getWebResult ENDP
 
 end start
