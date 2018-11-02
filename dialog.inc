@@ -48,15 +48,10 @@ changeRecycleState PROTO : DWORD
 
 searchSong PROTO: DWORD
 changePlayButton PROTO :DWORD, :BYTE
+displaySearchResult PROTO :DWORD
+downloadSong PROTO :DWORD
 
-;accDecoder.asm
-;accDecoder PROTO: DWORD, :DWORD, :DWORD;将acc解码成wav
-
-
-;download_API.asm
-getWebResult PROTO url: DWORD
-getSearchResult PROTO key: DWORD
-getDownloadLink PROTO sid: DWORD
+replaceChar PROTO, :PTR BYTE, :DWORD,:BYTE, :BYTE
 
 ;歌曲结构体
 Song STRUCT
@@ -64,6 +59,11 @@ Song STRUCT
 	_path BYTE 100 DUP(0);歌曲路径
 Song ends
 
+;搜索结果结构体
+SearchResult STRUCT
+	_name BYTE 100 DUP(0);歌曲名（包括歌手）
+	_id BYTE 20 DUP(0);歌曲id
+SearchResult ends
 
 RGB macro red,green,blue
 	xor eax,eax
@@ -95,7 +95,8 @@ endm
 	IDC_SilenceButton		EQU 1043;静音按钮
 	IDC_RecycleButton		EQU 1044;循环模式按钮
 	IDC_LyricsEdit		EQU 1052;歌词显示
-	IDC_SearchSongList		EQU 1053
+	IDC_SearchSongList		EQU 1053;搜索结果的展示
+	IDC_refreshImage		EQU 1056;搜索结果刷新
 
 	MAX_SONG_MENU_SIZE 	EQU 100
 	
@@ -167,13 +168,8 @@ endm
 	
 	hasSound BYTE 1;是否有声音
 	
-	searchInputText DB 50 DUP(0)
-	stringFormat DB "%s", 0DH, 0AH, 0DH, 0AH, 0
-	
-	test_key DB "Taylor", 0
-	
-	test_search_buf DB "/search?key=Taylor", 0
-	
+	searchInputText DB 50 DUP(0);搜索栏输入文本
+	searchResults SearchResult 20 dup(<"1","1">);搜索结果
 .data?
 	hInstance	dd	?
 	mediaCommand BYTE ?; 多媒体控制命令(mciSendString需要附加参数时使用）

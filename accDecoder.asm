@@ -14,7 +14,7 @@ includelib msvcrt.lib
 include user32.inc
 includelib user32.lib
 
-accDecoder2 PROTO :DWORD, :DWORD
+accDecoder PROTO :DWORD, :DWORD
 
 .code
 ;-------------------------------------------------------------------------------------------------------
@@ -30,15 +30,15 @@ accDecoder2 PROTO :DWORD, :DWORD
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 
-accDecoder2 PROC PUBLIC inputName:DWORD, outputName:DWORD
+accDecoder PROC PUBLIC inputName:DWORD, outputName:DWORD
 
 .data
 	PrcName db 'faad.exe',0
 	CmdLineFormat db 'faad -o "%s" "%s"',0
 	szPause db 'pause',0
 	FailInfo db "Fail to create a process",0
-	CmdLine db 200 DUP(0)	
-
+	;CmdLine db 200 DUP(0)	
+	CmdLine db "faad -o 1.wav Music/1.aac"
 .data?
 	SUInfo  STARTUPINFO <>
 	PrcInfo PROCESS_INFORMATION <>
@@ -49,7 +49,7 @@ accDecoder2 PROC PUBLIC inputName:DWORD, outputName:DWORD
 	mov SUInfo.wShowWindow, 0 
 	invoke crt_memset, ADDR PrcInfo, 0, sizeof PrcInfo
 	
-	invoke crt_sprintf, ADDR CmdLine, ADDR CmdLineFormat, outputName, inputName
+	;invoke crt_sprintf, ADDR CmdLine, ADDR CmdLineFormat, outputName, inputName
 
 	INVOKE  CreateProcess,ADDR PrcName,ADDR CmdLine,
                 NULL, NULL,CREATE_NO_WINDOW,
@@ -66,6 +66,6 @@ accDecoder2 PROC PUBLIC inputName:DWORD, outputName:DWORD
 		invoke CloseHandle,PrcInfo.hThread 
 	.endif
 	ret
-accDecoder2 ENDP
+accDecoder ENDP
 
 END

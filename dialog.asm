@@ -64,6 +64,12 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			invoke	SendMessage, hWin, WM_CLOSE, 0, 0
 		.elseif eax == IDC_ImportImage;按下导入歌曲键
 			invoke addSong, hWin
+			mov eax, wParam
+		.elseif ax == IDC_SearchSongList;双击查询结果
+			shr eax,16
+			.if ax == LBN_SELCHANGE;选中项发生改变
+				invoke downloadSong, hWin
+			.endif
 		.elseif songMenuSize == 0;若干歌单大小为0
 			Ret;则下述操作都不进行！！！
 		.elseif eax == IDC_PlayButton;若按下播放/暂停键
@@ -96,8 +102,10 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			invoke changeSilencState,hWin
 		.elseif eax == IDC_RecycleButton;按下循环按钮
 			invoke changeRecycleState,hWin
-		.elseif eax == IDC_SearchImage;push the search button
+		.elseif eax == IDC_SearchImage;按下搜索按钮
 			invoke searchSong,hWin
+		.elseif eax == IDC_refreshImage;按下刷新按钮
+			invoke displaySearchResult,hWin
 		.endif
 	.elseif	eax == WM_CLOSE;程序退出时执行
 		invoke closeSong, hWin
@@ -127,6 +135,9 @@ init proc hWin:DWORD
 		loop L1
 	.ENDIF
 	
+	;展示上一次的搜索结果
+	invoke displaySearchResult,hWin
+	
 	;初始化音量条范围为0-1000，初始值为1000
 	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETRANGEMIN, 0, 0
 	invoke SendDlgItemMessage, hWin, IDC_VolumeSlider, TBM_SETRANGEMAX, 0, sliderLength
@@ -145,7 +156,7 @@ init proc hWin:DWORD
 	;循环播放状态
 	mov repeatStatus,LIST_REPEAT
 	invoke changeRecycleButton,hWin
-	
+
 	Ret
 init endp
 
@@ -612,144 +623,195 @@ repeatControl endp
 
 
 ;-------------------------------------------------------------------------------------------------------
-; React when the search button is clicked
+; 点击搜索按钮时响应，会向服务器发送搜索请求，并将结果存在本地文件
 ; hWin是窗口句柄；
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 searchSong proc hWin: DWORD
-LOCAL threadId:DWORD
-	;decide whether the input text is empty
-	;search and display
-	invoke crt_memset, addr searchInputText, size searchInputText
-	invoke GetDlgItemText,hWin, IDC_SearchEdit, addr searchInputText, size searchInputText;//获取用户输入的关键词
-	;invoke MessageBox, hWin, addr searchInputText, addr searchInputText, MB_OK
-	;invoke getSearchResult,addr test_key;使用这句会使界面卡死
+.data
+	PrcName BYTE 'Network/search.exe',0;搜索的程序名
+	CmdLineFormat BYTE 'search "%s"',0;搜索的命令格式
+	FailInfo BYTE "Fail to create a process",0;失败信息
+	CmdLine BYTE 200 DUP(0)	;搜索命令
+	MessageString BYTE 50 DUP(0);用户提示信息
+	MessageTitle BYTE "提示",0;用户提示标题
+	MessageFormat BYTE "正在搜索 %s,确定后请点击刷新按钮来查看结果",0;用户提示格式
+.data?
+	SUInfo  STARTUPINFO <>
+	PrcInfo PROCESS_INFORMATION <>
+.code 
+	invoke crt_memset, addr searchInputText, size searchInputText, 0	
+	invoke GetDlgItemText,hWin, IDC_SearchEdit, addr searchInputText, size searchInputText
+	invoke crt_sprintf, addr MessageString, addr MessageFormat, addr searchInputText
+	invoke MessageBox, hWin, addr MessageString, addr MessageTitle, MB_OK
+
+	invoke crt_memset, ADDR SUInfo, 0, sizeof SUInfo
+	mov SUInfo.cb, sizeof SUInfo
+	mov SUInfo.dwFlags, STARTF_USESHOWWINDOW 
+	mov SUInfo.wShowWindow, 0 
+	invoke crt_memset, ADDR PrcInfo, 0, sizeof PrcInfo
+	
+	invoke crt_memset, ADDR CmdLine, 0, sizeof CmdLine
+	invoke crt_sprintf, ADDR CmdLine, ADDR CmdLineFormat, ADDR searchInputText
+
+	INVOKE  CreateProcess,ADDR PrcName,ADDR CmdLine,
+                NULL, NULL,CREATE_NO_WINDOW,
+                0,NULL,NULL,
+                ADDR SUInfo,ADDR PrcInfo
+	.if eax == 0
+		invoke MessageBox,hWin, ADDR FailInfo, ADDR FailInfo, MB_OK
+	.elseif
+		;Wait until child process exits.
+		invoke WaitForSingleObject, PrcInfo.hProcess, INFINITE
+
+		;Close process and thread handles. 
+		invoke CloseHandle,PrcInfo.hProcess
+		invoke CloseHandle,PrcInfo.hThread 
+	.endif
+
 	Ret
 searchSong endp
 
-; getSearchResult: 根据搜索关键词获取搜索结果
-; 参数: key, DWORD类型, 字符串指针, 内容为关键词
-; 返回值: eax, 搜索结果开始的位置，为字符串指针
-; 返回结果的格式为: "歌曲名和歌手#歌曲id$歌曲名和歌手#歌曲id&歌曲名和歌手#歌曲id..."共20条，同时保证歌曲名和歌曲id中没有其它的'$'和'#'
-; 特殊情况: 特殊的关键词可能导致返回结果不足20条
-getSearchResult PROC key: DWORD
+;-------------------------------------------------------------------------------------------------------
+; 点击刷新按钮时响应，会从本地文件中读取最新的搜索结果并展示出来
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+displaySearchResult proc hWin:DWORD
 .data
-	search_head DB "/search?key=", 0
-	search_buf DB 1024 DUP(0)
-
+	errorMessage BYTE "文件打开失败",0
+	stringBuffer BYTE 1000 DUP(0);从文件中读入的字符串
+	fileName BYTE "searchResult.txt",0
+	lastPos DWORD 0
+	nameEnd BYTE "#",0
+	idEnd BYTE "$",0
+.data?
+	hFile HANDLE ?
 .code
-	; 构造搜索连接的url
-	INVOKE lstrcpy, ADDR search_buf, ADDR search_head
-	INVOKE lstrcat, ADDR search_buf, key
-	; 访问服务器并拿到结果
-	INVOKE getWebResult, ADDR search_buf
-	ret
-getSearchResult ENDP
+	.repeat
+		invoke SendDlgItemMessage, hWin, IDC_SearchSongList, LB_DELETESTRING, 0, 0
+	.until (eax == 0 || eax == LB_ERR)
+	invoke CreateFile,addr fileName,GENERIC_READ OR GENERIC_WRITE,FILE_SHARE_READ OR FILE_SHARE_WRITE, NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL
+	mov hFile,eax
+	.if hFile == INVALID_HANDLE_VALUE
+		invoke MessageBox, hWin, addr errorMessage, addr errorMessage, MB_OK
+	.else
+		invoke crt_memset, addr searchResults, 0, sizeof searchResults
+		
+		invoke crt_memset, addr stringBuffer, 0, sizeof stringBuffer
+		invoke ReadFile, hFile, addr stringBuffer, length stringBuffer, NULL, NULL
 
-; getSearchResult: 根据搜索歌曲id获取歌曲下载链接
-; 参数: sid, DWORD类型, 字符串指针, 内容为歌曲id
-; 返回值: eax, 下载链接开始的位置，为字符串指针
-getDownloadLink PROC sid: DWORD
+		lea esi, searchResults;搜索结果
+		lea edi, stringBuffer;指向结果串的当前扫描位置
+
+		.while 1
+			mov lastPos, edi
+			invoke StrStr, edi, addr nameEnd
+			.break .if eax == NULL
+			mov edi, eax
+			mov ecx, edi
+			sub ecx, lastPos;计算子串长度
+			invoke crt_strncpy, ADDR (SearchResult PTR [esi])._name, lastPos, ecx
+			inc edi
+			
+			mov lastPos, edi
+			invoke StrStr, edi, addr idEnd
+			.break .if eax == NULL
+			mov edi, eax
+			mov ecx, edi
+			sub ecx, lastPos
+			invoke crt_strncpy, ADDR (SearchResult PTR [esi])._id, lastPos, ecx
+			inc edi
+			
+			invoke SendDlgItemMessage, hWin, IDC_SearchSongList, LB_ADDSTRING, 0, ADDR (SearchResult PTR [esi])._name
+			add esi, TYPE SearchResult
+		
+		.endw
+	.endif
+	Ret
+displaySearchResult endp
+
+;-------------------------------------------------------------------------------------------------------
+; 点击搜索结果中的歌曲时，开始下载歌曲到本地
+; hWin是窗口句柄；
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+downloadSong proc hWin:DWORD
 .data
-	get_url_head DB "/get_url?sid=", 0
-	get_url_buf DB 1024 DUP(0)
-
+	DownloadPrcName BYTE 'download.exe',0;下载程序的程序名
+	DownloadCmdLine BYTE 200 DUP(0);下载程序的命令
+	DownloadCmdLineFormat BYTE 'download "Music\\%s"#%s',0;下载程序的命令格式
+	DownloadMessageString BYTE 100 DUP(0);用户提示信息
+	DownloadMessageFormat BYTE "正在下载 %s 到Music文件夹，下载完成后可以手动导入歌曲",0
+	currentSelection DWORD 0;当前搜索结果选中的位置
+.data?
+	DownloadSUInfo  STARTUPINFO <>
+	DownloadPrcInfo PROCESS_INFORMATION <>
 .code
-	; 构造下载连接的url
-	INVOKE lstrcpy, ADDR get_url_buf, ADDR get_url_head
-	INVOKE lstrcat, ADDR get_url_buf, sid
-	; 访问服务器并拿到结果
-	INVOKE getWebResult, ADDR get_url_buf
-	ret
-getDownloadLink ENDP
+	invoke crt_memset, ADDR DownloadMessageString, 0, sizeof DownloadMessageString
 
-; getWebResult: 连接asm.wu-c.cn服务器并获取结果
-; 参数: url, DWORD类型, 字符串指针, 内容为要访问的url
-; 返回值: eax, 返回结果开始的位置，为字符串指针
-getWebResult PROC uses esi edi url: DWORD
-	LOCAL sock_data: WSADATA
-	LOCAL s_addr: sockaddr_in
-	LOCAL sock: DWORD
-	LOCAL n: DWORD
-	LOCAL p: DWORD
+	;获取当前选中的歌曲对应的数据存储位置
+	mov esi, TYPE SearchResult
+	invoke SendDlgItemMessage, hWin, IDC_SearchSongList, LB_GETCURSEL, 0, 0
+	mul esi
+	mov edi, eax
+	mov currentSelection, edi
 
-.data
-	server_ip DB "47.94.101.6", 0
-	request_head DB "GET ", 0
-	request_tail DB " HTTP/1.1", 0DH, 0AH, "Host: asm.wu-c.cn", 0DH, 0AH, "Connection:Close", 0DH, 0AH, 0DH, 0AH, 0
-	crlf2 DB 0DH, 0AH
-	crlf DB 0DH, 0AH, 0
-	request DB 1024 DUP(0)
-	result DB 2048 DUP(0)
-	BUFSIZE = 1024
+	;提示用户开始下载
+	invoke crt_sprintf, addr DownloadMessageString, addr DownloadMessageFormat, addr (SearchResult Ptr searchResults[edi])._name
+	invoke MessageBox, hWin, addr DownloadMessageString, addr MessageTitle, MB_OKCANCEL
 
-.code
-	; 初始化
-	INVOKE WSAStartup, 22h, ADDR sock_data
 
-	.IF eax != 0
-		ret
-	.ENDIF
+	;构造下载的命令
+	invoke crt_memset, ADDR DownloadCmdLine, 0, sizeof DownloadCmdLine
+	mov edi, currentSelection
+	invoke crt_sprintf, ADDR DownloadCmdLine, ADDR DownloadCmdLineFormat, addr (SearchResult Ptr searchResults[edi])._name, addr (SearchResult Ptr searchResults[edi])._id
+	invoke replaceChar,ADDR DownloadCmdLine, size DownloadCmdLine, 3FH, 5FH;将？都替换成_,解决URL访问时的bug
+	;invoke MessageBox, hWin, addr DownloadCmdLine, addr DownloadCmdLine, MB_OK
 
-	; 设置服务器ip和端口
-	lea esi, s_addr
-	mov WORD PTR [esi], AF_INET
-	INVOKE htons, 80
-	mov WORD PTR [esi + 2], ax
-	INVOKE inet_addr, ADDR server_ip
-	mov DWORD PTR [esi + 4], eax
 
-	; 创建并连接socket
-	INVOKE socket, AF_INET, SOCK_STREAM, IPPROTO_TCP
-	mov sock, eax
-	lea esi, s_addr
-	INVOKE connect, sock, esi, SIZEOF sockaddr_in
+	invoke crt_memset, ADDR DownloadSUInfo, 0, sizeof DownloadSUInfo
+	mov DownloadSUInfo.cb, sizeof DownloadSUInfo
+	mov DownloadSUInfo.dwFlags, STARTF_USESHOWWINDOW 
+	mov DownloadSUInfo.wShowWindow, 0 
+	invoke crt_memset, ADDR DownloadPrcInfo, 0, sizeof DownloadPrcInfo
 
-	.IF sock == -1 || sock == -2
-		ret
-	.ENDIF
+	INVOKE  CreateProcess,ADDR DownloadPrcName,ADDR DownloadCmdLine,
+                NULL, NULL,CREATE_NEW_CONSOLE,
+                0,NULL,NULL,
+                ADDR DownloadSUInfo,ADDR DownloadPrcInfo
+	.if eax == 0
+		invoke MessageBox,hWin, ADDR FailInfo, ADDR FailInfo, MB_OK
+	.elseif
+		;Wait until child process exits.
+		invoke WaitForSingleObject, DownloadPrcInfo.hProcess, INFINITE
 
-	; 构造http请求头
-	INVOKE lstrcpy, ADDR request, ADDR request_head
-	INVOKE lstrcat, ADDR request, url
-	INVOKE lstrcat, ADDR request, ADDR request_tail
-	INVOKE lstrlen, ADDR request
+		;Close process and thread handles. 
+		invoke CloseHandle,DownloadPrcInfo.hProcess
+		invoke CloseHandle,DownloadPrcInfo.hThread 
+	.endif
 
-	; 发送http请求
-	INVOKE send, sock, ADDR request, eax, 0
+	Ret
+downloadSong endp
 
-	; 接受http响应结果
-	mov n, eax
-	mov esi, OFFSET result
-	.WHILE n > 0
-		INVOKE recv, sock, esi, BUFSIZE, 0
-		mov n, eax
-		add esi, n
-	.ENDW
-	; 从http响应中提取body
-	push OFFSET crlf2
-	push OFFSET result
-	call crt_strstr
-	add esp, 8
-	add eax, 4
-	push OFFSET crlf
-	push eax
-	call crt_strstr
-	add esp, 8
-	add eax, 2
-	mov p, eax
-	push OFFSET crlf
-	push p
-	call crt_strstr
-	add esp, 8
-	mov BYTE PTR [eax], 0
-
-	; 清理
-	INVOKE WSACleanup
-
-	; 保存返回结果地址到eax中
-	mov eax, p
-	ret
-getWebResult ENDP
+;-------------------------------------------------------------------------------------------------------
+; 将stringPtr中的所有fromChar替换成toChar
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+replaceChar proc, stringPtr:PTR BYTE, stringLength:DWORD,fromChar:BYTE, toChar:BYTE
+	cld
+	mov ecx, 0
+	mov esi, stringPtr
+	mov al, fromChar
+	mov bl, toChar
+	.while ecx < stringLength
+		.if BYTE PTR[esi] == al
+			mov (BYTE PTR[esi]), bl
+		.endif
+		inc ecx
+		inc esi		
+	.endw
+	Ret
+replaceChar endp
 
 end start
