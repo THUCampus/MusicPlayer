@@ -9,6 +9,8 @@
 - 主程序在dialog.asm中，大部分声明在dialog.inc中。
 - Music文件夹是音乐默认的下载位置
 - Image文件夹存放程序需要的图片资源
+- Network/search.asm实现在网络上进行关键词搜索，返回相关的歌曲和id，并写道本地文件searchResult
+- download.asm实现根据歌曲id，下载歌曲到本地
 
 ## 功能（长期目标）
 
