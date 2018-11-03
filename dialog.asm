@@ -631,7 +631,8 @@ searchSong proc hWin: DWORD
 .data
 	PrcName BYTE 'Network/search.exe',0;搜索的程序名
 	CmdLineFormat BYTE 'search "%s"',0;搜索的命令格式
-	FailInfo BYTE "Fail to create a process",0;失败信息
+	FailInfoFormat BYTE "Fail to create a process,error %d",0;失败信息
+	FailInfo BYTE 50 DUP(0);失败信息
 	CmdLine BYTE 200 DUP(0)	;搜索命令
 	MessageString BYTE 50 DUP(0);用户提示信息
 	MessageTitle BYTE "提示",0;用户提示标题
@@ -659,8 +660,10 @@ searchSong proc hWin: DWORD
                 0,NULL,NULL,
                 ADDR SUInfo,ADDR PrcInfo
 	.if eax == 0
+		invoke GetLastError
+		invoke crt_sprintf, ADDR FailInfo, ADDR FailInfoFormat, eax
 		invoke MessageBox,hWin, ADDR FailInfo, ADDR FailInfo, MB_OK
-	.elseif
+	.else
 		;Wait until child process exits.
 		invoke WaitForSingleObject, PrcInfo.hProcess, INFINITE
 
@@ -740,6 +743,7 @@ downloadSong proc hWin:DWORD
 .data
 	DownloadPrcName BYTE 'download.exe',0;下载程序的程序名
 	DownloadCmdLine BYTE 200 DUP(0);下载程序的命令
+	SongPath BYTE 100 DUP(0);歌曲路径
 	DownloadCmdLineFormat BYTE 'download "Music\\%s"#%s',0;下载程序的命令格式
 	DownloadMessageString BYTE 100 DUP(0);用户提示信息
 	DownloadMessageFormat BYTE "正在下载 %s 到Music文件夹，下载完成后可以手动导入歌曲",0
@@ -764,10 +768,16 @@ downloadSong proc hWin:DWORD
 
 	;构造下载的命令
 	invoke crt_memset, ADDR DownloadCmdLine, 0, sizeof DownloadCmdLine
+	invoke crt_memset, ADDR SongPath, 0, sizeof SongPath
 	mov edi, currentSelection
-	invoke crt_sprintf, ADDR DownloadCmdLine, ADDR DownloadCmdLineFormat, addr (SearchResult Ptr searchResults[edi])._name, addr (SearchResult Ptr searchResults[edi])._id
+	invoke crt_strcpy,addr SongPath,addr (SearchResult Ptr searchResults[edi])._name
+	invoke replaceChar, addr SongPath,size SongPath, 20H, 5FH;将空格替换成_
+	
+	mov edi, currentSelection
+	invoke crt_sprintf, ADDR DownloadCmdLine, ADDR DownloadCmdLineFormat, addr SongPath, addr (SearchResult Ptr searchResults[edi])._id
 	invoke replaceChar,ADDR DownloadCmdLine, size DownloadCmdLine, 3FH, 5FH;将？都替换成_,解决URL访问时的bug
-	;invoke MessageBox, hWin, addr DownloadCmdLine, addr DownloadCmdLine, MB_OK
+	;invoke replaceChar,ADDR DownloadCmdLine, size DownloadCmdLine, 20H, 5FH;将空格替换成_
+	invoke MessageBox, hWin, addr DownloadCmdLine, addr DownloadCmdLine, MB_OK
 
 
 	invoke crt_memset, ADDR DownloadSUInfo, 0, sizeof DownloadSUInfo
@@ -776,13 +786,17 @@ downloadSong proc hWin:DWORD
 	mov DownloadSUInfo.wShowWindow, 0 
 	invoke crt_memset, ADDR DownloadPrcInfo, 0, sizeof DownloadPrcInfo
 
+   	invoke GetStartupInfo,ADDR DownloadSUInfo 
+
 	INVOKE  CreateProcess,ADDR DownloadPrcName,ADDR DownloadCmdLine,
-                NULL, NULL,CREATE_NEW_CONSOLE,
+                NULL, NULL,CREATE_NO_WINDOW,
                 0,NULL,NULL,
                 ADDR DownloadSUInfo,ADDR DownloadPrcInfo
 	.if eax == 0
+		invoke GetLastError
+		invoke crt_sprintf, ADDR FailInfo, ADDR FailInfoFormat, eax
 		invoke MessageBox,hWin, ADDR FailInfo, ADDR FailInfo, MB_OK
-	.elseif
+	.else
 		;Wait until child process exits.
 		invoke WaitForSingleObject, DownloadPrcInfo.hProcess, INFINITE
 
