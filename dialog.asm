@@ -609,7 +609,7 @@ repeatControl proc hWin: DWORD
 		invoke StrToInt, addr songLength
 		mov temp, eax
 		invoke StrToInt, addr songPosition
-		.if eax == temp;播放完了
+		.if eax >= temp;播放完了
 			.if repeatStatus == SINGLE_REPEAT;单曲循环
 				invoke mciSendString, addr setPosToStartCommand, NULL, 0, NULL;定位到歌曲开头
 				invoke mciSendString, addr playSongCommand, NULL, 0, NULL

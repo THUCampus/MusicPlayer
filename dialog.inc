@@ -104,7 +104,7 @@ endm
 	LIST_REPEAT			EQU 1;ÁĞ±íÑ­»·
 	
 .data	
-	openSongCommand BYTE 'open "%s" alias currentSong',0;´ò¿ª¸èÇúÃüÁî
+	openSongCommand BYTE 'open "%s" alias currentSong type mpegvideo',0;´ò¿ª¸èÇúÃüÁî
 	playSongCommand BYTE "play currentSong", 0;²¥·Å¸èÇúÃüÁî
 	pauseSongCommand BYTE "pause currentSong",0;ÔİÍ£¸èÇúÃüÁî
 	resumeSongCommand BYTE "resume currentSong",0;»Ö¸´¸èÇú²¥·ÅÃüÁî
