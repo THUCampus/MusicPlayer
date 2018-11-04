@@ -170,6 +170,8 @@ endm
 	
 	searchInputText DB 50 DUP(0);搜索栏输入文本
 	searchResults SearchResult 20 dup(<"1","1">);搜索结果
+	
+	guiWorkingDir BYTE 200 DUP(0);GUI主程序的工作路径
 .data?
 	hInstance	dd	?
 	mediaCommand BYTE ?; 多媒体控制命令(mciSendString需要附加参数时使用）
