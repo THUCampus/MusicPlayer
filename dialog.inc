@@ -112,6 +112,7 @@ endm
 	
 	SINGLE_REPEAT		EQU 0;单曲循环
 	LIST_REPEAT			EQU 1;列表循环
+	WM_SHELLNOTIFY    	equ WM_USER+5 
 	
 .data	
 	openSongCommand BYTE 'open "%s" alias currentSong type mpegvideo',0;打开歌曲命令
@@ -202,6 +203,7 @@ endm
 	lyricVisible dword 1;是否显示歌词
 	lyricEmpty byte 0;不显示歌词时用的字符串
 	
+	guiWorkingDir BYTE 200 DUP(0);GUI主程序的工作路径
 .data?
 	hInstance	dd	?
 	mediaCommand BYTE ?; 多媒体控制命令(mciSendString需要附加参数时使用）

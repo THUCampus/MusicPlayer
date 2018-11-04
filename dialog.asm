@@ -19,8 +19,13 @@ start:
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
+	LOCAL wc:WNDCLASSEX 
 	mov	eax,uMsg
 	.if	eax == WM_INITDIALOG;初始化界面
+    
+    	mov   wc.style, CS_HREDRAW or CS_VREDRAW or CS_DBLCLKS 
+    	invoke RegisterClassEx, addr wc 
+		
 		invoke loadFile, hWin
 		invoke init, hWin
 		invoke	LoadIcon,hInstance,200
@@ -129,6 +134,10 @@ DlgProc endp
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 init proc hWin:DWORD
+	;获取程序工作目录
+	invoke GetCurrentDirectory,200, addr guiWorkingDir
+	;invoke MessageBox,hWin, addr guiWorkingDir, addr guiWorkingDir, MB_OK
+	
 	;展示歌单中的所有歌曲
 	mov esi, offset songMenu
 	mov ecx, songMenuSize
@@ -162,8 +171,6 @@ init proc hWin:DWORD
 	;循环播放状态
 	mov repeatStatus,LIST_REPEAT
 	invoke changeRecycleButton,hWin
-	
-	
 	
 	Ret
 init endp
@@ -463,9 +470,12 @@ changeSong proc hWin:DWORD, newSongIndex: DWORD
 	mov eax, newSongIndex
 	mov currentSongIndex, eax
 	invoke openSong,hWin, currentSongIndex;打开新的歌曲
-	mov currentStatus, 1;转为播放状态
-	invoke changePlayButton,hWin,1
-	invoke mciSendString, ADDR playSongCommand, NULL, 0, NULL;播放歌曲
+	.if currentStatus == 1
+		invoke mciSendString, ADDR playSongCommand, NULL, 0, NULL;播放歌曲
+	.endif
+	;mov currentStatus, 1;转为播放状态
+	;invoke changePlayButton,hWin,1
+	
 	invoke changeVolume,hWin;设置音量为当前音量Slider的值
 	
 	;设置时间进度条最大长度为歌曲长度(毫秒)
@@ -850,19 +860,26 @@ repeatControl endp
 ;-------------------------------------------------------------------------------------------------------
 searchSong proc hWin: DWORD
 .data
-	PrcName BYTE 'Network/search.exe',0;搜索的程序名
+	PrcName BYTE 200 DUP(0);
+	PrcNameFormat BYTE '%s\search.exe',0;搜索的程序名
 	CmdLineFormat BYTE 'search "%s"',0;搜索的命令格式
-	FailInfo BYTE "Fail to create a process",0;失败信息
+	FailInfoFormat BYTE "Fail to create a process,error %d",0;失败信息
+	FailInfo BYTE 50 DUP(0);失败信息
 	CmdLine BYTE 200 DUP(0)	;搜索命令
 	MessageString BYTE 50 DUP(0);用户提示信息
 	MessageTitle BYTE "提示",0;用户提示标题
-	MessageFormat BYTE "正在搜索 %s,确定后请点击刷新按钮来查看结果",0;用户提示格式
+	MessageFormat BYTE "正在搜索 %s",0;用户提示格式
 .data?
 	SUInfo  STARTUPINFO <>
 	PrcInfo PROCESS_INFORMATION <>
 .code 
-	invoke crt_memset, addr searchInputText, size searchInputText, 0	
+	invoke crt_sprintf, addr PrcName, addr PrcNameFormat, addr guiWorkingDir
+	;invoke MessageBox,hWin,addr PrcName,addr PrcName, MB_OK
+	
+	invoke crt_memset, addr searchInputText, 0, size searchInputText	
 	invoke GetDlgItemText,hWin, IDC_SearchEdit, addr searchInputText, size searchInputText
+	
+	invoke crt_memset, addr MessageString, 0, size MessageString
 	invoke crt_sprintf, addr MessageString, addr MessageFormat, addr searchInputText
 	invoke MessageBox, hWin, addr MessageString, addr MessageTitle, MB_OK
 
@@ -872,22 +889,28 @@ searchSong proc hWin: DWORD
 	mov SUInfo.wShowWindow, 0 
 	invoke crt_memset, ADDR PrcInfo, 0, sizeof PrcInfo
 	
+	invoke GetStartupInfo,ADDR SUInfo 
+	
 	invoke crt_memset, ADDR CmdLine, 0, sizeof CmdLine
 	invoke crt_sprintf, ADDR CmdLine, ADDR CmdLineFormat, ADDR searchInputText
 
 	INVOKE  CreateProcess,ADDR PrcName,ADDR CmdLine,
                 NULL, NULL,CREATE_NO_WINDOW,
-                0,NULL,NULL,
+                0,NULL,ADDR guiWorkingDir,
                 ADDR SUInfo,ADDR PrcInfo
 	.if eax == 0
+		invoke GetLastError
+		invoke crt_sprintf, ADDR FailInfo, ADDR FailInfoFormat, eax
 		invoke MessageBox,hWin, ADDR FailInfo, ADDR FailInfo, MB_OK
-	.elseif
+	.else
 		;Wait until child process exits.
 		invoke WaitForSingleObject, PrcInfo.hProcess, INFINITE
 
 		;Close process and thread handles. 
 		invoke CloseHandle,PrcInfo.hProcess
 		invoke CloseHandle,PrcInfo.hThread 
+		
+		invoke displaySearchResult,hWin
 	.endif
 
 	Ret
@@ -901,18 +924,22 @@ searchSong endp
 displaySearchResult proc hWin:DWORD
 .data
 	errorMessage BYTE "文件打开失败",0
-	stringBuffer BYTE 1000 DUP(0);从文件中读入的字符串
-	fileName BYTE "searchResult.txt",0
+	stringBuffer BYTE 4000 DUP(0);从文件中读入的字符串
+	resultsFileNameFormat BYTE "%s\searchResult.txt",0
+	resultsFileName BYTE 100 DUP(0)
 	lastPos DWORD 0
 	nameEnd BYTE "#",0
 	idEnd BYTE "$",0
 .data?
 	hFile HANDLE ?
 .code
+	invoke crt_sprintf, addr resultsFileName, addr resultsFileNameFormat, addr guiWorkingDir
+	;invoke MessageBox,hWin, addr resultsFileName, addr resultsFileName, MB_OK
+	
 	.repeat
 		invoke SendDlgItemMessage, hWin, IDC_SearchSongList, LB_DELETESTRING, 0, 0
 	.until (eax == 0 || eax == LB_ERR)
-	invoke CreateFile,addr fileName,GENERIC_READ OR GENERIC_WRITE,FILE_SHARE_READ OR FILE_SHARE_WRITE, NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL
+	invoke CreateFile,addr resultsFileName,GENERIC_READ OR GENERIC_WRITE,FILE_SHARE_READ OR FILE_SHARE_WRITE, NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL
 	mov hFile,eax
 	.if hFile == INVALID_HANDLE_VALUE
 		invoke MessageBox, hWin, addr errorMessage, addr errorMessage, MB_OK
@@ -921,6 +948,8 @@ displaySearchResult proc hWin:DWORD
 		
 		invoke crt_memset, addr stringBuffer, 0, sizeof stringBuffer
 		invoke ReadFile, hFile, addr stringBuffer, length stringBuffer, NULL, NULL
+		invoke crt_strcat, addr stringBuffer, addr idEnd
+		;invoke MessageBox,hWin, addr stringBuffer,addr stringBuffer, MB_OK
 
 		lea esi, searchResults;搜索结果
 		lea edi, stringBuffer;指向结果串的当前扫描位置
@@ -946,7 +975,6 @@ displaySearchResult proc hWin:DWORD
 			
 			invoke SendDlgItemMessage, hWin, IDC_SearchSongList, LB_ADDSTRING, 0, ADDR (SearchResult PTR [esi])._name
 			add esi, TYPE SearchResult
-		
 		.endw
 	.endif
 	Ret
@@ -959,8 +987,10 @@ displaySearchResult endp
 ;-------------------------------------------------------------------------------------------------------
 downloadSong proc hWin:DWORD
 .data
-	DownloadPrcName BYTE 'download.exe',0;下载程序的程序名
+	DownloadPrcName BYTE 200 DUP(0);
+	DownloadPrcNameFormat BYTE '%s\download.exe',0;下载程序的程序名
 	DownloadCmdLine BYTE 200 DUP(0);下载程序的命令
+	SongPath BYTE 100 DUP(0);歌曲路径
 	DownloadCmdLineFormat BYTE 'download "Music\\%s"#%s',0;下载程序的命令格式
 	DownloadMessageString BYTE 100 DUP(0);用户提示信息
 	DownloadMessageFormat BYTE "正在下载 %s 到Music文件夹，下载完成后可以手动导入歌曲",0
@@ -969,6 +999,9 @@ downloadSong proc hWin:DWORD
 	DownloadSUInfo  STARTUPINFO <>
 	DownloadPrcInfo PROCESS_INFORMATION <>
 .code
+	invoke crt_sprintf, addr DownloadPrcName, addr DownloadPrcNameFormat, addr guiWorkingDir
+	;invoke MessageBox,hWin,addr DownloadPrcName,addr DownloadPrcName, MB_OK
+	
 	invoke crt_memset, ADDR DownloadMessageString, 0, sizeof DownloadMessageString
 
 	;获取当前选中的歌曲对应的数据存储位置
@@ -980,14 +1013,20 @@ downloadSong proc hWin:DWORD
 
 	;提示用户开始下载
 	invoke crt_sprintf, addr DownloadMessageString, addr DownloadMessageFormat, addr (SearchResult Ptr searchResults[edi])._name
-	invoke MessageBox, hWin, addr DownloadMessageString, addr MessageTitle, MB_OKCANCEL
+	invoke MessageBox, hWin, addr DownloadMessageString, addr MessageTitle, MB_OK
 
 
 	;构造下载的命令
 	invoke crt_memset, ADDR DownloadCmdLine, 0, sizeof DownloadCmdLine
+	invoke crt_memset, ADDR SongPath, 0, sizeof SongPath
 	mov edi, currentSelection
-	invoke crt_sprintf, ADDR DownloadCmdLine, ADDR DownloadCmdLineFormat, addr (SearchResult Ptr searchResults[edi])._name, addr (SearchResult Ptr searchResults[edi])._id
+	invoke crt_strcpy,addr SongPath,addr (SearchResult Ptr searchResults[edi])._name
+	invoke replaceChar, addr SongPath,size SongPath, 20H, 5FH;将空格替换成_
+	
+	mov edi, currentSelection
+	invoke crt_sprintf, ADDR DownloadCmdLine, ADDR DownloadCmdLineFormat, addr SongPath, addr (SearchResult Ptr searchResults[edi])._id
 	invoke replaceChar,ADDR DownloadCmdLine, size DownloadCmdLine, 3FH, 5FH;将？都替换成_,解决URL访问时的bug
+	;invoke replaceChar,ADDR DownloadCmdLine, size DownloadCmdLine, 20H, 5FH;将空格替换成_
 	;invoke MessageBox, hWin, addr DownloadCmdLine, addr DownloadCmdLine, MB_OK
 
 
@@ -997,19 +1036,25 @@ downloadSong proc hWin:DWORD
 	mov DownloadSUInfo.wShowWindow, 0 
 	invoke crt_memset, ADDR DownloadPrcInfo, 0, sizeof DownloadPrcInfo
 
+   	invoke GetStartupInfo,ADDR DownloadSUInfo 
+
 	INVOKE  CreateProcess,ADDR DownloadPrcName,ADDR DownloadCmdLine,
-                NULL, NULL,CREATE_NEW_CONSOLE,
-                0,NULL,NULL,
+                NULL, NULL,CREATE_NO_WINDOW,
+                0,NULL,ADDR guiWorkingDir,
                 ADDR DownloadSUInfo,ADDR DownloadPrcInfo
 	.if eax == 0
+		invoke GetLastError
+		invoke crt_sprintf, ADDR FailInfo, ADDR FailInfoFormat, eax
 		invoke MessageBox,hWin, ADDR FailInfo, ADDR FailInfo, MB_OK
-	.elseif
+	.else
 		;Wait until child process exits.
-		invoke WaitForSingleObject, DownloadPrcInfo.hProcess, INFINITE
+		;invoke WaitForSingleObject, DownloadPrcInfo.hProcess, INFINITE
 
 		;Close process and thread handles. 
 		invoke CloseHandle,DownloadPrcInfo.hProcess
 		invoke CloseHandle,DownloadPrcInfo.hThread 
+		
+		;此处填写添加歌曲的函数！
 	.endif
 
 	Ret

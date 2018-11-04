@@ -1,4 +1,3 @@
-;根据给定的歌曲名和id下载歌曲到本地
 .386
 .model flat, stdcall
 .stack 4096
@@ -111,7 +110,7 @@ getArg PROC commandPtr:DWORD, len:DWORD, DIVIDE:BYTE
 	mov ecx, len
 	repne scasb
 	.if ecx > 0
-		add edi, 1
+		;add edi, 1
 		mov eax, edi
 	.elseif
 		mov eax,0
