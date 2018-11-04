@@ -19,8 +19,13 @@ start:
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
+	LOCAL wc:WNDCLASSEX 
 	mov	eax,uMsg
 	.if	eax == WM_INITDIALOG;初始化界面
+    
+    	mov   wc.style, CS_HREDRAW or CS_VREDRAW or CS_DBLCLKS 
+    	invoke RegisterClassEx, addr wc 
+		
 		invoke loadFile, hWin
 		invoke init, hWin
 		invoke	LoadIcon,hInstance,200
@@ -248,9 +253,12 @@ changeSong proc hWin:DWORD, newSongIndex: DWORD
 	mov eax, newSongIndex
 	mov currentSongIndex, eax
 	invoke openSong,hWin, currentSongIndex;打开新的歌曲
-	mov currentStatus, 1;转为播放状态
-	invoke changePlayButton,hWin,1
-	invoke mciSendString, ADDR playSongCommand, NULL, 0, NULL;播放歌曲
+	.if currentStatus == 1
+		invoke mciSendString, ADDR playSongCommand, NULL, 0, NULL;播放歌曲
+	.endif
+	;mov currentStatus, 1;转为播放状态
+	;invoke changePlayButton,hWin,1
+	
 	invoke changeVolume,hWin;设置音量为当前音量Slider的值
 	
 	;设置时间进度条最大长度为歌曲长度(毫秒)

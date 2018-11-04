@@ -102,6 +102,7 @@ endm
 	
 	SINGLE_REPEAT		EQU 0;单曲循环
 	LIST_REPEAT			EQU 1;列表循环
+	WM_SHELLNOTIFY    	equ WM_USER+5 
 	
 .data	
 	openSongCommand BYTE 'open "%s" alias currentSong',0;打开歌曲命令
