@@ -649,7 +649,7 @@ searchSong proc hWin: DWORD
 	CmdLine BYTE 200 DUP(0)	;搜索命令
 	MessageString BYTE 50 DUP(0);用户提示信息
 	MessageTitle BYTE "提示",0;用户提示标题
-	MessageFormat BYTE "正在搜索 %s,确定后请点击刷新按钮来查看结果",0;用户提示格式
+	MessageFormat BYTE "正在搜索 %s",0;用户提示格式
 .data?
 	SUInfo  STARTUPINFO <>
 	PrcInfo PROCESS_INFORMATION <>
@@ -705,7 +705,7 @@ searchSong endp
 displaySearchResult proc hWin:DWORD
 .data
 	errorMessage BYTE "文件打开失败",0
-	stringBuffer BYTE 1000 DUP(0);从文件中读入的字符串
+	stringBuffer BYTE 4000 DUP(0);从文件中读入的字符串
 	resultsFileNameFormat BYTE "%s\searchResult.txt",0
 	resultsFileName BYTE 100 DUP(0)
 	lastPos DWORD 0
@@ -729,6 +729,8 @@ displaySearchResult proc hWin:DWORD
 		
 		invoke crt_memset, addr stringBuffer, 0, sizeof stringBuffer
 		invoke ReadFile, hFile, addr stringBuffer, length stringBuffer, NULL, NULL
+		invoke crt_strcat, addr stringBuffer, addr idEnd
+		;invoke MessageBox,hWin, addr stringBuffer,addr stringBuffer, MB_OK
 
 		lea esi, searchResults;搜索结果
 		lea edi, stringBuffer;指向结果串的当前扫描位置
@@ -754,7 +756,6 @@ displaySearchResult proc hWin:DWORD
 			
 			invoke SendDlgItemMessage, hWin, IDC_SearchSongList, LB_ADDSTRING, 0, ADDR (SearchResult PTR [esi])._name
 			add esi, TYPE SearchResult
-		
 		.endw
 	.endif
 	Ret
@@ -828,7 +829,7 @@ downloadSong proc hWin:DWORD
 		invoke MessageBox,hWin, ADDR FailInfo, ADDR FailInfo, MB_OK
 	.else
 		;Wait until child process exits.
-		invoke WaitForSingleObject, DownloadPrcInfo.hProcess, INFINITE
+		;invoke WaitForSingleObject, DownloadPrcInfo.hProcess, INFINITE
 
 		;Close process and thread handles. 
 		invoke CloseHandle,DownloadPrcInfo.hProcess
