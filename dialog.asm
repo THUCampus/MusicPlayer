@@ -33,6 +33,7 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 	.elseif eax == WM_TIMER;计时器消息
 		.if currentStatus == 1
 			invoke changeTimeSlider, hWin;更改进度条滑块位置
+			invoke displayLyric, hWin;刷新歌词显示
 			invoke repeatControl, hWin;检测是否已经播放完成，若已完成则根据当前循环模式播放相应的歌曲
 		.endif
 	.elseif eax == WM_HSCROLL;slider消息
@@ -57,10 +58,13 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			
 		.elseif curSlider == IDC_TimeSlider;调节进度
 			.if ax == SB_ENDSCROLL;滚动结束消息
+				mov isDraggingTimeSlider, 0
 				invoke SendDlgItemMessage, hWin, IDC_SongMenu, LB_GETCURSEL, 0, 0;则获取被选中的下标
 				.if eax != -1;当前有歌曲被选中，则发送mcisendstring命令调整进度
 					invoke changeTime, hWin
 				.endif
+			.elseif ax == SB_THUMBTRACK;滚动消息
+				mov isDraggingTimeSlider, 1
 			.endif
 		.endif
 	.elseif eax == WM_COMMAND
@@ -111,6 +115,8 @@ DlgProc proc hWin:DWORD,uMsg:DWORD,wParam:DWORD,lParam:DWORD
 			invoke searchSong,hWin
 		.elseif eax == IDC_refreshImage;按下刷新按钮
 			invoke displaySearchResult,hWin
+		.elseif eax == IDC_LyricsImage
+			invoke switchLyricDisplay, hWin
 		.endif
 	.elseif	eax == WM_CLOSE;程序退出时执行
 		invoke closeSong, hWin
@@ -170,15 +176,226 @@ init proc hWin:DWORD
 init endp
 
 ;-------------------------------------------------------------------------------------------------------
+; 读取与当前歌曲同目录且同名的LRC文件
+; Receives: hWin是窗口句柄，index是歌曲在歌单中下标；
+; Returns: 0 如果失败，1 如果成功。
+;-------------------------------------------------------------------------------------------------------
+readLrcFile proc hWin:DWORD, index:DWORD
+	local hFile:DWORD
+	local curTime:DWORD
+	local dscale:DWORD
+	local offs:DWORD
+	local times:DWORD
+	
+	mov lyricLines, 0
+	
+	mov offs, 48;asc转int
+	
+	mov eax, index
+	mov ebx, type songMenu
+	mul ebx;此时eax中存储了第index首歌曲相对于songMenu的偏移地址
+	invoke lstrcpy,addr lrcFile,addr songMenu[eax]._path
+	
+	invoke StrRStrI,addr lrcFile, NULL, addr point;找到“.”的位置
+	mov esi, eax
+	invoke lstrcpy,esi, addr lrcSuffix;把点后面的内容换成lrc后缀
+	
+	;读取酷我音乐的lrc文件
+	invoke CreateFile,addr lrcFile,GENERIC_READ,0,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0
+	mov hFile, eax
+	.if hFile == INVALID_HANDLE_VALUE;打开失败
+		mov hasLyric, byte ptr 0;把hasLyric置0表示未检索到当前歌曲同目录下的同名歌词文件
+		invoke SendDlgItemMessage, hWin, IDC_LyricsEdit, WM_SETTEXT, 0, addr noLyricText
+	.else;有歌词文件，进行解析，逐行存进内存中的数组里
+		mov hasLyric, byte ptr 1;haslyric置1
+		mov currentLyricIndex, 0;把当前歌词下标置0
+		invoke ReadFile, hFile, addr lrcBuffer, sizeof lrcBuffer, addr actualReadBytes, NULL;lrcBuffer里存的是文件的全部内容
+		;这里找的是[，然后判断[后面跟的是否为数字，如果为数字则是一句歌词，如果不是则是歌曲开头的信息
+		mov times, 0
+		invoke StrStrI,addr lrcBuffer, addr lyricNextSentence
+		mov esi, eax
+		
+		rLF_L1:
+		movzx ebx, byte ptr [esi+1]
+		;跳过开头的其他信息，直到是数字为止
+		.if ebx>=48;'0'
+			.if ebx<=57;'9'
+				;解析这句歌词的进度，分钟:秒.厘秒
+				movzx eax, byte ptr [esi+1]
+				sub eax, offs
+				mov dscale, 10
+				mul dscale
+				
+				movzx ebx, byte ptr [esi+2]
+				sub ebx, offs
+				add eax, ebx
+				mov dscale, 60
+				mul dscale
+				
+				push eax
+				
+				movzx eax, byte ptr [esi+4]
+				sub eax, offs
+				mov dscale, 10
+				mul dscale
+				
+				movzx ebx, byte ptr [esi+5]
+				sub ebx, offs
+				add eax, ebx
+				
+				pop ebx;取出分钟转换成的秒数
+				
+				add eax, ebx;现在eax里存了总秒数
+				
+				mov dscale, 100
+				mul dscale;现在是厘秒
+				
+				push eax
+				
+				movzx eax, byte ptr [esi+7]
+				sub eax, offs
+				mov dscale, 10
+				mul dscale
+				
+				movzx ebx, byte ptr [esi+8]
+				sub ebx,offs
+				add eax, ebx
+				
+				pop ebx
+				add eax, ebx;现在eax存了总的厘秒数
+				
+				mov dscale, 10
+				mul dscale;现在是毫秒数
+				
+				mov curTime, eax
+				mov eax, times
+				mov ebx, TYPE dword
+				mul ebx;此时eax中存储了第times行歌曲相对于lyricArray的偏移地址
+				mov ebx, curTime
+				mov [lyricTimes + eax], ebx;当前歌词的毫秒级时间存进lyricTimes中
+				mov [lyricAddrs + eax], esi;当前歌词的[的地址存进lyricAddrs里面
+				
+				invoke StrStrI,addr [esi+1], addr lyricNextSentence
+				.if eax != 0
+					mov esi, eax;esi现在指向下一个[的地址
+					;现在只是把lrcBuffer里的各个歌词行[位置的地址存进lyricAddrs数组里面
+					inc times
+					jmp rLF_L1
+				.else
+					mov eax, times
+					mov maxLyricIndex, eax;存储当前歌曲最大歌词下标
+					jmp rLF_LEND
+				.endif
+			.else
+				invoke StrStrI,addr [esi+1], addr lyricNextSentence
+				mov esi, eax
+				cmp eax, 0;不等于0代表还有新的[，即新的歌词行，等于0退出
+				jne rLF_L1
+				jmp rLF_LEND
+			.endif
+		.else
+			invoke StrStrI,addr [esi+1], addr lyricNextSentence
+			mov esi, eax
+			cmp eax, 0;不等于0代表还有新的[，即新的歌词行，等于0退出
+			jne rLF_L1
+			jmp rLF_LEND
+		.endif
+	.endif
+	rLF_LEND:
+	INVOKE CloseHandle, hFile
+	
+	Ret
+readLrcFile endp
+
+;-------------------------------------------------------------------------------------------------------
+; 实时显示歌词
+; Receives: hWin是窗口句柄
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+displayLyric proc hWin:DWORD
+	local tmpLoop:DWORD
+	local curTime:DWORD
+	local lastTime:DWORD
+	local curSongPos:DWORD
+	.if currentStatus == 1;播放状态，其他的状态不管
+		.if hasLyric == 1;有歌词文件
+			.if lyricVisible == 1;用户希望显示歌词
+				invoke mciSendString, addr getPositionCommand, addr songPosition, 32, NULL;获取当前播放位置
+				invoke StrToInt, addr songPosition;当前进度转成int存在eax里
+				mov curSongPos, eax
+				
+				;遍历所有歌词
+				mov tmpLoop, 0
+				mov lastTime, 0
+				mov curTime, 0
+				mov edx, tmpLoop
+				.while edx <= maxLyricIndex
+					mov eax, tmpLoop
+					mov ebx, TYPE dword
+					mul ebx;此时eax中存储了第tmpLoop行歌曲相对于lyricArray的偏移地址
+					
+					mov ebx, lyricTimes[eax];ebx现在存了第tmpLoop行歌词的开始时间
+					mov curTime, ebx
+					.if ebx > curSongPos;找到了第一句开始时间比当前歌曲进度大的歌词，显示它的前一句
+						;通过lyricAddrs寻址到相应的歌词字符串，显示到歌词框里
+						mov edi, lyricAddrs[eax];把这句歌词的[地址赋给edi
+						mov ebx, tmpLoop
+						.if ebx == 0;当前是第一句歌词，显示六个点
+							;invoke lstrcpy, addr longStr, addr [edi+10]
+							invoke SendDlgItemMessage, hWin, IDC_LyricsEdit, WM_SETTEXT, 0, addr lyricPreparation;改变歌词框的显示
+						.else
+							mov eax, tmpLoop
+							mov ebx, TYPE dword
+							mul ebx;此时eax中存储了第times行歌曲相对于lyricArray的偏移地址
+							;pop edi;弹出本次的[地址给edi
+							sub eax, TYPE dword
+							mov esi, lyricAddrs[eax];现在esi指前一个[地址
+							mov edx, edi;edx现在指向当前[地址
+							sub edx, esi;edx现在是当前[和上一个[之间的字节数
+							sub edx, 10;edx现在是字节数减10（和addr [edi+10]相对应，去掉[分钟:秒.厘秒]，只存后面真正的歌词）
+							invoke lstrcpyn, addr longStr, addr [esi+10], edx
+							invoke SendDlgItemMessage, hWin, IDC_LyricsEdit, WM_SETTEXT, 0, addr longStr;改变歌词框的显示
+						.endif
+						jmp dL_LEND
+					.endif
+					inc tmpLoop
+					mov edx, tmpLoop
+				.endw
+			.endif
+		.endif
+	.endif
+	dL_LEND:
+	Ret
+displayLyric endp
+
+;-------------------------------------------------------------------------------------------------------
+; 切换歌词显示状态
+; Receives: hWin是窗口句柄
+; Returns: none
+;-------------------------------------------------------------------------------------------------------
+switchLyricDisplay proc hWin:DWORD
+	.if lyricVisible == 1;当前正在显示
+		mov lyricVisible, 0
+		invoke SendDlgItemMessage, hWin, IDC_LyricsEdit, WM_SETTEXT, 0, addr lyricEmpty;改变歌词框的显示
+	.else
+		mov lyricVisible, 1
+	.endif
+	Ret
+switchLyricDisplay endp
+
+;-------------------------------------------------------------------------------------------------------
 ; 打开某首歌
 ; Receives: index是歌曲在歌单中下标；
 ; Requires: currentStatus == 0 即当前状态必须是停止状态
 ; Returns: none
 ;-------------------------------------------------------------------------------------------------------
 openSong proc hWin:DWORD, index:DWORD
+	;查找歌曲同级目录下有没有与之同名的lrc文件
+	invoke readLrcFile, hWin, index
 	mov eax, index
 	mov ebx, TYPE songMenu
 	mul ebx;此时eax中存储了第index首歌曲相对于songMenu的偏移地址
+	
 	invoke wsprintf, ADDR mediaCommand, ADDR openSongCommand, ADDR songMenu[eax]._path
 	invoke mciSendString, ADDR mediaCommand, NULL, 0, NULL;打开歌曲
 	Ret
@@ -531,7 +748,9 @@ changeTimeSlider proc hWin: DWORD
 		invoke mciSendString, addr getPositionCommand, addr songPosition, 32, NULL;获取当前播放位置
 		invoke StrToInt, addr songPosition;当前进度转成int存在eax里
 		mov temp, eax
-		invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETPOS, 1, temp
+		.if isDraggingTimeSlider == 0;若当前用户没在拖时间条那么实时更新进度条位置
+			invoke SendDlgItemMessage, hWin, IDC_TimeSlider, TBM_SETPOS, 1, temp
+		.endif
 		invoke displayTime, hWin, temp
 	.endif
 	Ret
@@ -621,7 +840,7 @@ repeatControl proc hWin: DWORD
 		invoke StrToInt, addr songLength
 		mov temp, eax
 		invoke StrToInt, addr songPosition
-		.if eax == temp;播放完了
+		.if eax >= temp;播放完了
 			.if repeatStatus == SINGLE_REPEAT;单曲循环
 				invoke mciSendString, addr setPosToStartCommand, NULL, 0, NULL;定位到歌曲开头
 				invoke mciSendString, addr playSongCommand, NULL, 0, NULL
